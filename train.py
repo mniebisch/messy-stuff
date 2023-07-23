@@ -1,4 +1,5 @@
 import pathlib
+from collections import OrderedDict
 
 import torch
 import torch.nn as nn
@@ -32,6 +33,25 @@ class Autoencoder(nn.Module):
         decoded = self.decoder(encoded)
         return decoded
 
+
+def filter_state_dict_by_prefix(state_dict: OrderedDict[str, torch.Tensor], prefix: str) -> OrderedDict[str, torch.Tensor]:
+    """
+    Filters the given PyTorch state_dict to only keep keys that start with the specified prefix.
+
+    Args:
+        state_dict (OrderedDict[str, torch.Tensor]): The state dict of the PyTorch model, where keys are strings and values are PyTorch tensors.
+        prefix (str): The prefix to filter keys by.
+
+    Returns:
+        OrderedDict[str, torch.Tensor]: The filtered state dict containing only keys starting with the given prefix.
+    """
+    filtered_state_dict = OrderedDict()
+    for key, value in state_dict.items():
+        if key.startswith(prefix):
+            filtered_state_dict[key] = value
+
+    return filtered_state_dict
+
 # Set the number of features and encoding dimension
 input_size = 3 * 543
 encoding_dim = 128
@@ -56,7 +76,7 @@ train_pipe = load_data_framewise(csv_file=train_csv, data_path=data_path, batch_
 train_loader = dataloader2.DataLoader2(train_pipe)
 
 # Train the autoencoder
-num_epochs = 2
+num_epochs = 0
 for epoch in range(num_epochs):
     print(epoch)
     for data in train_loader:
@@ -78,4 +98,5 @@ for epoch in range(num_epochs):
     print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item()}")
 
 # Save the encoder weights
-torch.save(model.encoder.state_dict(), 'encoder_weights.pth')
+model_state_dict = model.state_dict()
+torch.save(filter_state_dict_by_prefix(model_state_dict, 'encoder.'), 'encoder_weights.pth')

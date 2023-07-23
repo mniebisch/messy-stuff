@@ -16,7 +16,8 @@ base_path = pathlib.Path(__file__).parent
 data_path = base_path
 
 train_csv = data_path / "output.csv"
-
+ckpt_file = "encoder_weights.pth"
+ckpt_path = base_path / ckpt_file
 
 # Define the encoder model
 class Encoder(nn.Module):
@@ -41,6 +42,7 @@ encoding_dim = 128
 
 # Create an instance of the encoder model
 encoder = Encoder(input_size, encoding_dim)
+encoder.load_state_dict(torch.load(ckpt_path))
 
 pipeline = load_pointclouds(csv_file=train_csv, data_path=data_path, batch_size=20)
 
