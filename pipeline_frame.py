@@ -31,7 +31,7 @@ def flatten_point_cloud(x):
 def cast_float32(x: npt.NDArray) -> npt.NDArray:
     return x.astype(np.float32)
 
-def load_data_framewise(csv_file, data_path, batch_size):
+def load_data_framewise(csv_file, data_path, batch_size, drop_last_batch: bool = True):
     file_path_mapper = functools.partial(create_path, data_path=data_path)
 
     # all available files
@@ -52,7 +52,7 @@ def load_data_framewise(csv_file, data_path, batch_size):
     datapipe = datapipe.unbatch()
     
     datapipe = datapipe.shuffle(buffer_size=10000)
-    datapipe = datapipe.batch(batch_size=batch_size, drop_last=True)
+    datapipe = datapipe.batch(batch_size=batch_size, drop_last=drop_last_batch)
     datapipe = datapipe.collate()
 
     return datapipe
