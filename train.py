@@ -129,10 +129,11 @@ data_path = base_path.parent / "effective-octo-potato" / "data"
 train_csv = data_path / "train.csv"
 batch_size = 1024
 train_pipe = load_data_framewise(csv_file=train_csv, data_path=data_path, batch_size=batch_size)
-train_loader = dataloader2.DataLoader2(train_pipe)
+multi_processor = dataloader2.MultiProcessingReadingService(num_workers=12)
+train_loader = dataloader2.DataLoader2(train_pipe, reading_service=multi_processor)
 
 # Number of frames in overall dataset (extracted from count_frames)
-num_frames = count_frames_in_csv(train_csv)
+# num_frames = count_frames_in_csv(train_csv)
 num_frames = count_frames_in_csv_parallel(train_csv)
 
 # Train the autoencoder
