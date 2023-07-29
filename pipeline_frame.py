@@ -38,11 +38,12 @@ def load_data_framewise(csv_file, data_path, batch_size):
     datapipe = torchdata.datapipes.iter.FileOpener([str(csv_file)])
     datapipe = datapipe.parse_csv(skip_lines=1)
     datapipe = datapipe.shuffle(buffer_size=1000)
-    datapipe = datapipe.sharding_filter()  # required here?
+    datapipe = datapipe.sharding_filter()
     datapipe = datapipe.map(file_path_mapper)
 
     # restructure sequence into bunch of frames
     datapipe = datapipe.map(load_parquet)
+    # datapipe = datapipe.in_memory_cache(size=1)
     datapipe = datapipe.map(unstack_sequence)
     datapipe = datapipe.map(flatten_point_cloud)
     datapipe = datapipe.map(np.nan_to_num)
@@ -51,7 +52,6 @@ def load_data_framewise(csv_file, data_path, batch_size):
     datapipe = datapipe.unbatch()
     
     datapipe = datapipe.shuffle(buffer_size=10000)
-    datapipe = datapipe.sharding_filter()
     datapipe = datapipe.batch(batch_size=batch_size, drop_last=True)
     datapipe = datapipe.collate()
 
