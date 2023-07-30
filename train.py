@@ -9,6 +9,7 @@ import pyarrow.parquet as pq
 from torchdata import dataloader2
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
+import wandb
 
 from pipeline_frame import load_data_framewise
 
@@ -108,58 +109,68 @@ def count_frames_in_csv_parallel(csv_file_path: str) -> int:
 
     return sum(results)
 
-# Set the number of features and encoding dimension
-input_size = 3 * 543
-encoding_dim = 128
 
-# Create an instance of the autoencoder model
-model = Autoencoder(input_size, encoding_dim)
 
-# Move the model to the GPU if available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = model.to(device)
+if __name__ == "__main__":
+    wandb.init(project="ssl-signing")
 
-# Define the loss function and optimizer
-criterion = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+    # Set the number of features and encoding dimension
+    input_size = 3 * 543
+    encoding_dim = 128
 
-# Define the training dataset and dataloader (modify as per your data)
-base_path = pathlib.Path(__file__).parent
-data_path = base_path.parent / "effective-octo-potato" / "data"
-train_csv = data_path / "train.csv"
-batch_size = 1024
-train_pipe = load_data_framewise(csv_file=train_csv, data_path=data_path, batch_size=batch_size)
-multi_processor = dataloader2.MultiProcessingReadingService(num_workers=12)
-train_loader = dataloader2.DataLoader2(train_pipe, reading_service=multi_processor)
+    # Create an instance of the autoencoder model
+    model = Autoencoder(input_size, encoding_dim)
 
-# Number of frames in overall dataset (extracted from count_frames)
-# num_frames = count_frames_in_csv(train_csv)
-num_frames = count_frames_in_csv_parallel(train_csv)
+    # Move the model to the GPU if available
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
 
-# Train the autoencoder
-num_epochs = 3
-for epoch in range(num_epochs):
-    with tqdm(desc="Processing", unit="iter", position=0, leave=True, total=num_frames // batch_size) as pbar:
-        for data in train_loader:
-            img = data
-            
-            # Move the input data to the GPU
-            img = img.to(device)
+    # Define the loss function and optimizer
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-            # Forward pass
-            output = model(img)
-            loss = criterion(output, img)
-            
-            # Backward pass and optimization
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            pbar.update(1)
+    # Define the training dataset and dataloader (modify as per your data)
+    base_path = pathlib.Path(__file__).parent
+    data_path = base_path.parent / "effective-octo-potato" / "data"
+    train_csv = data_path / "train.csv"
+    batch_size = 1024
+    train_pipe = load_data_framewise(csv_file=train_csv, data_path=data_path, batch_size=batch_size)
+    multi_processor = dataloader2.MultiProcessingReadingService(num_workers=12)
+    train_loader = dataloader2.DataLoader2(train_pipe, reading_service=multi_processor)
 
-            
-        # Print the loss after each epoch
-        # print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item()}")
+    # Number of frames in overall dataset (extracted from count_frames)
+    # num_frames = count_frames_in_csv(train_csv)
+    num_frames = count_frames_in_csv_parallel(train_csv)
 
-# Save the encoder weights
-model_state_dict = model.state_dict()
-torch.save(filter_state_dict_by_prefix(model_state_dict, 'encoder.'), 'encoder_weights.pth')
+    wandb.watch(model, log="all")
+
+    # Train the autoencoder
+    num_epochs = 3
+    for epoch in range(num_epochs):
+        with tqdm(desc="Processing", unit="iter", position=0, leave=True, total=num_frames // batch_size) as pbar:
+            for data in train_loader:
+                img = data
+                
+                # Move the input data to the GPU
+                img = img.to(device)
+
+                # Forward pass
+                output = model(img)
+                loss = criterion(output, img)
+                
+                # Backward pass and optimization
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                wandb.log({"loss": loss.item()})
+
+                pbar.update(1)
+
+                
+            # Print the loss after each epoch
+            # print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item()}")
+
+    # Save the encoder weights
+    model_state_dict = model.state_dict()
+    torch.save(filter_state_dict_by_prefix(model_state_dict, 'encoder.'), 'encoder_weights.pth')
