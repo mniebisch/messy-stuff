@@ -43,7 +43,6 @@ def load_data_framewise(csv_file, data_path, batch_size, drop_last_batch: bool =
 
     # restructure sequence into bunch of frames
     datapipe = datapipe.map(load_parquet)
-    # datapipe = datapipe.in_memory_cache(size=1)
     datapipe = datapipe.map(unstack_sequence)
     datapipe = datapipe.map(flatten_point_cloud)
     datapipe = datapipe.map(np.nan_to_num)
