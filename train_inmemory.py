@@ -5,8 +5,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, Dataset
 import wandb
+import torchvision.transforms as transforms
 
 # Define the autoencoder model with separate encoder and decoder
 class Autoencoder(nn.Module):
@@ -14,17 +15,16 @@ class Autoencoder(nn.Module):
         super(Autoencoder, self).__init__()
         
         self.encoder = nn.Sequential(
-            nn.Linear(input_size, 256),
+            nn.Linear(input_size, 1024),
             nn.ReLU(),
-            nn.Linear(256, encoding_dim),
-            nn.ReLU()
+            nn.Linear(1024, encoding_dim),
         )
         
         self.decoder = nn.Sequential(
-            nn.Linear(encoding_dim, 256),
             nn.ReLU(),
-            nn.Linear(256, input_size),
-            nn.Sigmoid()
+            nn.Linear(encoding_dim, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, input_size),
         )
         
     def forward(self, x):
@@ -52,6 +52,31 @@ def filter_state_dict_by_prefix(state_dict: OrderedDict[str, torch.Tensor], pref
     return filtered_state_dict
 
 
+class InMemoryDataset(Dataset):
+    def __init__(self, data_tensor, transform=None):
+        self.data_tensor = data_tensor
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data_tensor)
+
+    def __getitem__(self, idx):
+        sample = self.data_tensor[idx]
+
+        if self.transform:
+            sample = self.transform(sample)
+
+        return sample
+
+class AddGaussianNoise(object):
+    def __init__(self, mean=0.0, std=1.0):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        noise = torch.randn_like(tensor) * self.std + self.mean
+        return tensor + noise
+
 if __name__ == "__main__":
     wandb.init(project="ssl-signing")
 
@@ -78,7 +103,12 @@ if __name__ == "__main__":
 
     pt_file = base_path / "data" / "frame_dataset.pt"
     pt_data = torch.load(pt_file)
-    dataset = TensorDataset(pt_data)
+
+    transform = transforms.Compose([
+        AddGaussianNoise(mean=0.0, std=0.2),
+    ])
+
+    dataset = InMemoryDataset(pt_data, transform=transform)
     data_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, num_workers=12)
 
     wandb.watch(model, log="all")
@@ -92,7 +122,7 @@ if __name__ == "__main__":
         for data in batch_iterator:
             optimizer.zero_grad()
             # Move the input data to the GPU
-            data = data[0].to(device)
+            data = data.to(device)
 
             # Forward pass
             output = model(data)
