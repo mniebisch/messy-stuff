@@ -1,9 +1,7 @@
 import pathlib
-from typing import Union, Tuple
+from typing import Union
 
 import torch
-import pandas as pd
-import torchdata
 from torchdata.datapipes.iter import IterableWrapper
 
 def load_from_ram(pt_file: Union[str, pathlib.Path], batch_size, drop_last_batch: bool = True):
