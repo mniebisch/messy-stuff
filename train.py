@@ -138,14 +138,13 @@ if __name__ == "__main__":
     multi_processor = dataloader2.MultiProcessingReadingService(num_workers=12)
     train_loader = dataloader2.DataLoader2(train_pipe, reading_service=multi_processor)
 
-    # Number of frames in overall dataset (extracted from count_frames)
-    # num_frames = count_frames_in_csv(train_csv)
     num_frames = count_frames_in_csv_parallel(train_csv)
 
     wandb.watch(model, log="all")
 
     # Train the autoencoder
     num_epochs = 3
+    model.train()
     for epoch in range(num_epochs):
         with tqdm(desc="Processing", unit="iter", position=0, leave=True, total=num_frames // batch_size) as pbar:
             rolling_loss = None
@@ -171,12 +170,7 @@ if __name__ == "__main__":
                 else:
                     rolling_loss = 0.9 * rolling_loss + 0.1 * loss.item()
                 pbar.set_postfix({"loss": rolling_loss})
-
                 pbar.update(1)
-
-                
-            # Print the loss after each epoch
-            # print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item()}")
 
     # Save the encoder weights
     model_state_dict = model.state_dict()
