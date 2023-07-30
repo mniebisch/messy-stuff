@@ -148,6 +148,7 @@ if __name__ == "__main__":
     num_epochs = 3
     for epoch in range(num_epochs):
         with tqdm(desc="Processing", unit="iter", position=0, leave=True, total=num_frames // batch_size) as pbar:
+            rolling_loss = None
             for data in train_loader:
                 img = data
                 
@@ -164,6 +165,12 @@ if __name__ == "__main__":
                 optimizer.step()
 
                 wandb.log({"loss": loss.item()})
+
+                if rolling_loss is None:
+                    rolling_loss = loss.item()
+                else:
+                    rolling_loss = 0.9 * rolling_loss + 0.1 * loss.item()
+                pbar.set_postfix({"loss": rolling_loss})
 
                 pbar.update(1)
 
