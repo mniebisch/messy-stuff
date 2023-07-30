@@ -50,7 +50,8 @@ def load_data_framewise(csv_file, data_path, batch_size, drop_last_batch: bool =
     datapipe = datapipe.map(cast_float32)
     datapipe = datapipe.map(listify_frames)
     datapipe = datapipe.unbatch()
-    
+    datapipe = datapipe.in_memory_cache(size=30)
+
     datapipe = datapipe.shuffle(buffer_size=10000)
     datapipe = datapipe.batch(batch_size=batch_size, drop_last=drop_last_batch)
     datapipe = datapipe.collate()
