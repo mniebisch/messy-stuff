@@ -6,7 +6,7 @@ from torchdata.datapipes.iter import IterableWrapper
 
 
 def load_from_ram(pt_data: torch.Tensor, batch_size, drop_last_batch: bool = True):
-    datapipe = IterableWrapper(pt_data)
+    datapipe = IterableWrapper(pt_data, deepcopy=False)
     datapipe = datapipe.shuffle()
     datapipe = datapipe.sharding_filter()
     datapipe = datapipe.batch(batch_size=batch_size, drop_last=drop_last_batch)
