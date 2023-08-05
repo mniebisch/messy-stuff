@@ -4,7 +4,7 @@ import pathlib
 import pandas as pd
 
 if __name__ == "__main__":
-    data_basepath = pathlib.Path("~/data")
+    data_basepath = pathlib.Path.home() / "data"
     data_path = data_basepath / "asl_signs"
 
     # load labels
