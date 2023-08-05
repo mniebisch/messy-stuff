@@ -25,10 +25,10 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
 
         self.encoder = nn.Sequential(
-            nn.Linear(input_size, 256),
+            nn.Linear(input_size, 1024),
             nn.ReLU(),
-            nn.Linear(256, encoding_dim),
-            nn.ReLU()
+            nn.Linear(1024, encoding_dim),
+            # nn.ReLU()
         )
 
     def forward(self, x):

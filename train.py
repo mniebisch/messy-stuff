@@ -143,7 +143,7 @@ if __name__ == "__main__":
     wandb.watch(model, log="all")
 
     # Train the autoencoder
-    num_epochs = 3
+    num_epochs = 10
     model.train()
     for epoch in range(num_epochs):
         with tqdm(desc="Processing", unit="iter", position=0, leave=True, total=num_frames // batch_size) as pbar:
