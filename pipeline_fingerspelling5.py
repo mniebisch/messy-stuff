@@ -56,13 +56,12 @@ def create_one_hot(
 
 
 def load_fingerspelling5(
-    csv_file: Union[str, pathlib.Path], batch_size: int = 64, drop_last: bool = True
+    hand_landmark_data: pd.DataFrame, batch_size: int = 64, drop_last: bool = True
 ):
     num_letters = ord("z") - ord("a") + 1 - 2
 
     one_hot = functools.partial(create_one_hot, num_classes=num_letters)
 
-    hand_landmark_data = pd.read_csv(csv_file)
     landmark_cols = generate_hand_landmark_columns()
     person_col = "person"
     letter_col = "letter"
@@ -88,6 +87,8 @@ def load_fingerspelling5(
 if __name__ == "__main__":
     data_path = pathlib.Path(__file__).parent / "data"
     train_csv = data_path / "fingerspelling5_singlehands.csv"
+
+    train_data = pd.read_csv(train_csv)
 
     fu = load_fingerspelling5(train_csv, batch_size=64)
     for batch, labels in fu:
