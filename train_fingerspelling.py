@@ -29,6 +29,23 @@ class MLPClassifier(nn.Module):
         return x
 
 
+def eval(model: torch.nn.Module, pipline, device: str) -> float:
+    model.eval()
+    total = 0
+    correct = 0
+    with torch.no_grad():
+        batch_iterator = tqdm(pipline)
+        for landmark_batch, label_batch in batch_iterator:
+            landmark_batch = landmark_batch.to(device)
+            prediction = model(landmark_batch)
+            prediction = prediction.detach().cpu()
+            prediction_label = torch.argmax(prediction, dim=1)
+            label_batch = torch.argmax(label_batch, dim=1)  # hacky hacky
+            total += label_batch.shape[0]
+            correct += (prediction_label == label_batch).sum().item()
+    return correct / total
+
+
 if __name__ == "__main__":
     wandb.init(project="fingerspelling5")
 
@@ -54,14 +71,27 @@ if __name__ == "__main__":
 
     groups = landmark_data["person"]
 
-    gss = GroupShuffleSplit(n_splits=3, train_size=0.8, random_state=42)
+    gss = GroupShuffleSplit(n_splits=3, train_size=0.8)
     train_index, val_index = next(gss.split(None, None, groups))
 
     train_data = landmark_data.loc[train_index]
-    val_data = landmark_data.loc[val_index]
+    valid_data = landmark_data.loc[val_index]
 
     train_pipe = load_fingerspelling5(train_data, batch_size=batch_size, drop_last=True)
     train_loader = dataloader2.DataLoader2(train_pipe)
+
+    eval_train_pipe = load_fingerspelling5(
+        train_data, batch_size=batch_size, drop_last=False
+    )
+    eval_train_loader = dataloader2.DataLoader2(
+        eval_train_pipe, datapipe_adapter_fn=dataloader2.adapter.Shuffle(enable=False)
+    )
+    eval_valid_pipe = load_fingerspelling5(
+        valid_data, batch_size=batch_size, drop_last=False
+    )
+    eval_valid_loader = dataloader2.DataLoader2(
+        eval_valid_pipe, datapipe_adapter_fn=dataloader2.adapter.Shuffle(enable=False)
+    )
 
     wandb.watch(model, log="all")
 
@@ -93,6 +123,9 @@ if __name__ == "__main__":
             else:
                 rolling_loss = 0.9 * rolling_loss + 0.1 * loss.item()
             batch_iterator.set_postfix({"loss": rolling_loss})
+        train_acc = eval(model, eval_train_loader, device)
+        valid_acc = eval(model, eval_valid_loader, device)
+        print(f"Train acc: {train_acc}, Valid acc: {valid_acc}")
 
     # Save the encoder weights
     model_state_dict = model.state_dict()
