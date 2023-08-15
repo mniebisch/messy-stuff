@@ -1,3 +1,4 @@
+import json
 import pathlib
 
 import pandas as pd
@@ -73,6 +74,11 @@ if __name__ == "__main__":
 
     gss = GroupShuffleSplit(n_splits=3, train_size=0.8)
     train_index, val_index = next(gss.split(None, None, groups))
+
+    split_log = {"train_index": train_index.tolist(), "valid_index": val_index.tolist()}
+
+    with open("fingerspelling_data_split.json", "w", encoding="utf-8") as f:
+        json.dump(split_log, f, ensure_ascii=False, indent=4)
 
     train_data = landmark_data.loc[train_index]
     valid_data = landmark_data.loc[val_index]
