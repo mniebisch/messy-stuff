@@ -76,6 +76,7 @@ if __name__ == "__main__":
     data_path = pathlib.Path(__file__).parent / "data"
     fingerspelling_landmark_csv = data_path / "fingerspelling5_singlehands.csv"
     batch_size = 512
+    filter_nan = True
 
     landmark_data = pd.read_csv(fingerspelling_landmark_csv)
 
@@ -89,13 +90,13 @@ if __name__ == "__main__":
     valid_data = landmark_data.loc[val_index]
 
     eval_train_pipe = load_fingerspelling5(
-        train_data, batch_size=batch_size, drop_last=False
+        train_data, batch_size=batch_size, drop_last=False, filter_nan=filter_nan
     )
     eval_train_loader = dataloader2.DataLoader2(
         eval_train_pipe, datapipe_adapter_fn=dataloader2.adapter.Shuffle(enable=False)
     )
     eval_valid_pipe = load_fingerspelling5(
-        valid_data, batch_size=batch_size, drop_last=False
+        valid_data, batch_size=batch_size, drop_last=False, filter_nan=filter_nan
     )
     eval_valid_loader = dataloader2.DataLoader2(
         eval_valid_pipe, datapipe_adapter_fn=dataloader2.adapter.Shuffle(enable=False)

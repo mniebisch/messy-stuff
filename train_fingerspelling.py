@@ -83,17 +83,21 @@ if __name__ == "__main__":
     train_data = landmark_data.loc[train_index]
     valid_data = landmark_data.loc[val_index]
 
-    train_pipe = load_fingerspelling5(train_data, batch_size=batch_size, drop_last=True)
+    filter_nan = True
+
+    train_pipe = load_fingerspelling5(
+        train_data, batch_size=batch_size, drop_last=True, filter_nan=filter_nan
+    )
     train_loader = dataloader2.DataLoader2(train_pipe)
 
     eval_train_pipe = load_fingerspelling5(
-        train_data, batch_size=batch_size, drop_last=False
+        train_data, batch_size=batch_size, drop_last=False, filter_nan=filter_nan
     )
     eval_train_loader = dataloader2.DataLoader2(
         eval_train_pipe, datapipe_adapter_fn=dataloader2.adapter.Shuffle(enable=False)
     )
     eval_valid_pipe = load_fingerspelling5(
-        valid_data, batch_size=batch_size, drop_last=False
+        valid_data, batch_size=batch_size, drop_last=False, filter_nan=filter_nan
     )
     eval_valid_loader = dataloader2.DataLoader2(
         eval_valid_pipe, datapipe_adapter_fn=dataloader2.adapter.Shuffle(enable=False)
