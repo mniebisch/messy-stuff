@@ -1,6 +1,6 @@
 import functools
 import pathlib
-from typing import List, Tuple, Union
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -55,8 +55,16 @@ def create_one_hot(
     return landmarks, one_hot
 
 
+def nan_filter(inputs: Tuple[npt.NDArray, int]) -> bool:
+    coords, _, _ = inputs
+    return bool(np.logical_not(np.any(np.isnan(coords))))
+
+
 def load_fingerspelling5(
-    hand_landmark_data: pd.DataFrame, batch_size: int = 64, drop_last: bool = True
+    hand_landmark_data: pd.DataFrame,
+    batch_size: int = 64,
+    drop_last: bool = True,
+    filter_nan: bool = False,
 ):
     num_letters = ord("z") - ord("a") + 1 - 2
 
@@ -74,7 +82,10 @@ def load_fingerspelling5(
     )
 
     datapipe = datapipe.map(cast_float32)
-    datapipe = datapipe.map(fill_nan)
+    if filter_nan:
+        datapipe = datapipe.filter(nan_filter)
+    else:
+        datapipe = datapipe.map(fill_nan)
     datapipe = datapipe.map(map_label)
     datapipe = datapipe.map(one_hot)
     datapipe = datapipe.shuffle(buffer_size=100000)
@@ -90,6 +101,6 @@ if __name__ == "__main__":
 
     train_data = pd.read_csv(train_csv)
 
-    fu = load_fingerspelling5(train_csv, batch_size=64)
+    fu = load_fingerspelling5(train_data, batch_size=64, filter_nan=True)
     for batch, labels in fu:
         print("oi")
