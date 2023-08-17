@@ -99,6 +99,22 @@ if __name__ == "__main__":
             prediction = prediction.numpy()
             prediction = prediction.argmax()
 
+        # show sample point coordinate
+        sample_point = point_cloud[0, :3]
+        sample_point = sample_point.tolist()
+        samp_x, samp_y, samp_z = sample_point
+        sample_point_text = f"Sample: ({samp_x:.2f},{samp_y:.2f},{samp_z:.2f})"
+        sample_point_position = (10, 50)
+        cv2.putText(
+            frame,
+            sample_point_text,
+            sample_point_position,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 0),
+            1,
+        )
+
         # Display the predicted label alongside the webcam output
         predicted_label = number_to_letter(prediction)
         label_position = (10, 30)
