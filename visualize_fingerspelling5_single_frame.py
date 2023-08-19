@@ -103,7 +103,9 @@ if __name__ == "__main__":
         x=landmarks[:, 0],
         y=landmarks[:, 1],
         mode="markers+text",
-        marker=dict(size=6, color="blue"),
+        marker=dict(
+            size=10, color=landmarks[:, 2], colorscale="Viridis", showscale=True
+        ),
         text=[str(i) for i in range(21)],  # Label each landmark with its index
         textposition="top center",
     )
