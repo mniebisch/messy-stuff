@@ -98,13 +98,26 @@ if __name__ == "__main__":
     # Show the plot
     fig.show()
 
+    values = landmarks[:, 2]
+    cmin = min(values)
+    cmax = max(values)
+
+    # Function to interpolate points between two landmarks
+    def interpolate_points(p1, p2, num_points):
+        return np.linspace(p1, p2, num_points + 2)[1:-1]
+
     # Create scatter plot for (x-y) pairing
     scatter_xy = go.Scatter(
         x=landmarks[:, 0],
         y=landmarks[:, 1],
         mode="markers+text",
         marker=dict(
-            size=10, color=landmarks[:, 2], colorscale="Viridis", showscale=True
+            size=15,
+            color=values,
+            colorscale="Viridis",
+            showscale=True,
+            cmin=cmin,
+            cmax=cmax,
         ),
         text=[str(i) for i in range(21)],  # Label each landmark with its index
         textposition="top center",
@@ -112,6 +125,10 @@ if __name__ == "__main__":
 
     # Create lines for edges in the (x-y) view
     lines = []
+    num_interpolated_points = (
+        8  # Number of interpolated points between each pair of connected landmarks
+    )
+
     for edge in edges:
         x_line = [landmarks[edge[0], 0], landmarks[edge[1], 0]]
         y_line = [landmarks[edge[0], 1], landmarks[edge[1], 1]]
@@ -120,7 +137,45 @@ if __name__ == "__main__":
                 x=x_line,
                 y=y_line,
                 mode="lines",
-                line=dict(color="red"),
+                line=dict(color="black"),
+                showlegend=False,
+            )
+        )
+        x_points = [
+            landmarks[edge[0], 0],
+            *interpolate_points(
+                landmarks[edge[0], 0], landmarks[edge[1], 0], num_interpolated_points
+            ),
+            landmarks[edge[1], 0],
+        ]
+        y_points = [
+            landmarks[edge[0], 1],
+            *interpolate_points(
+                landmarks[edge[0], 1], landmarks[edge[1], 1], num_interpolated_points
+            ),
+            landmarks[edge[1], 1],
+        ]
+        interpolated_values = [
+            values[edge[0]],
+            *interpolate_points(
+                values[edge[0]], values[edge[1]], num_interpolated_points
+            ),
+            values[edge[1]],
+        ]
+
+        lines.append(
+            go.Scatter(
+                x=x_points,
+                y=y_points,
+                mode="markers",
+                marker=dict(
+                    size=8,
+                    color=interpolated_values,
+                    colorscale="Viridis",
+                    cmin=cmin,
+                    cmax=cmax,
+                ),
+                hovertemplate=[str(val) for val in interpolated_values],
                 showlegend=False,
             )
         )
