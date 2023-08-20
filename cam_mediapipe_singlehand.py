@@ -100,7 +100,7 @@ if __name__ == "__main__":
             prediction = prediction.argmax()
 
         # show sample point coordinate
-        sample_point = point_cloud[0, :3]
+        sample_point = point_cloud[0, 6:9]
         sample_point = sample_point.tolist()
         samp_x, samp_y, samp_z = sample_point
         sample_point_text = f"Sample: ({samp_x:.2f},{samp_y:.2f},{samp_z:.2f})"
