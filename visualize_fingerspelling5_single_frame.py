@@ -185,10 +185,11 @@ if __name__ == "__main__":
 
     # Set layout for (x-y) view scatter plot
     scatter_layout = dict(
-        title="Hand Landmarks (X-Y) with Connections",
+        title="Hand Landmarks (Y-X) with Connections and Interpolated Markers",
         showlegend=False,
         xaxis_title="X",
-        yaxis_title="Y",
+        yaxis_title="y",
+        yaxis=dict(autorange="reversed"),  # Reverse the y-axis
     )
 
     fig_xy.update_layout(scatter_layout)
