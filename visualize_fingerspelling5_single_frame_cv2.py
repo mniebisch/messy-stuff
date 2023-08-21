@@ -38,6 +38,8 @@ def draw_hand(canvas, landmarks):
         (9, 13),
         (13, 17),
     ]
+    if landmarks.shape != (21, 3):
+        raise ValueError("Landmarks have incorrect shape.")
     values = landmarks[:, 2]
     cmin = min(values)
     cmax = max(values)
