@@ -5,36 +5,8 @@ import cv2
 import numpy as np
 import pandas as pd
 
-if __name__ == "__main__":
-    # Define the training dataset and dataloader (modify as per your data)
-    data_path = pathlib.Path(__file__).parent / "data"
-    fingerspelling_landmark_csv = data_path / "fingerspelling5_singlehands.csv"
 
-    landmark_data = pd.read_csv(fingerspelling_landmark_csv)
-
-    # Load datasplit
-    split_file = "fingerspelling_data_split.json"
-    with open(split_file, "r") as f:
-        split_data = json.load(f)
-    train_index = split_data["train_index"]
-    val_index = split_data["valid_index"]
-
-    train_data = landmark_data.loc[train_index]
-    train_data = train_data.dropna()
-
-    # Reshape coords
-    coord_columns = train_data.columns.values[:-2]
-    num_rows = len(train_data)
-    point_data_raw = train_data.iloc[:, :-2].values
-    point_data = point_data_raw.reshape(num_rows, -1, 3)
-
-    landmarks = point_data[0]
-
-    # Create a white canvas
-    width = 800
-    height = 400
-    canvas = np.ones((height, width, 3), dtype=np.uint8) * 255
-
+def draw_hand(canvas, width, height, landmarks):
     # Landmark indices and edges
     edges = [
         (0, 1),
@@ -127,6 +99,40 @@ if __name__ == "__main__":
                 color_bgr,
                 -1,
             )
+    return canvas
+
+
+if __name__ == "__main__":
+    # Define the training dataset and dataloader (modify as per your data)
+    data_path = pathlib.Path(__file__).parent / "data"
+    fingerspelling_landmark_csv = data_path / "fingerspelling5_singlehands.csv"
+
+    landmark_data = pd.read_csv(fingerspelling_landmark_csv)
+
+    # Load datasplit
+    split_file = "fingerspelling_data_split.json"
+    with open(split_file, "r") as f:
+        split_data = json.load(f)
+    train_index = split_data["train_index"]
+    val_index = split_data["valid_index"]
+
+    train_data = landmark_data.loc[train_index]
+    train_data = train_data.dropna()
+
+    # Reshape coords
+    coord_columns = train_data.columns.values[:-2]
+    num_rows = len(train_data)
+    point_data_raw = train_data.iloc[:, :-2].values
+    point_data = point_data_raw.reshape(num_rows, -1, 3)
+
+    landmarks = point_data[0]
+
+    # Create a white canvas
+    width = 800
+    height = 400
+    canvas = np.ones((height, width, 3), dtype=np.uint8) * 255
+
+    canvas = draw_hand(canvas, width, height, landmarks)
 
     # Show the canvas
     cv2.imshow("Hand Landmarks", canvas)
