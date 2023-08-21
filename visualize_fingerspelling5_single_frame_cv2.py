@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 
 
-def draw_hand(canvas, width, height, landmarks):
+def draw_hand(canvas, landmarks):
+    height, width, _ = canvas.shape
     # Landmark indices and edges
     edges = [
         (0, 1),
@@ -128,11 +129,11 @@ if __name__ == "__main__":
     landmarks = point_data[0]
 
     # Create a white canvas
-    width = 800
-    height = 400
-    canvas = np.ones((height, width, 3), dtype=np.uint8) * 255
+    canvas_width = 800
+    canvas_height = 400
+    canvas = np.ones((canvas_height, canvas_width, 3), dtype=np.uint8) * 255
 
-    canvas = draw_hand(canvas, width, height, landmarks)
+    canvas = draw_hand(canvas, landmarks)
 
     # Show the canvas
     cv2.imshow("Hand Landmarks", canvas)
