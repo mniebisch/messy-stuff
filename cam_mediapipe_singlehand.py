@@ -51,10 +51,12 @@ class MLPClassifier(nn.Module):
 
 def draw_hand(frame, results):
     if results.multi_hand_landmarks:
+        landmarks = np.full((21, 3), np.nan, dtype=np.float32)
         for hand_landmarks in results.multi_hand_landmarks:
-            for landmark in hand_landmarks.landmark:
+            for i, landmark in enumerate(hand_landmarks.landmark):
                 height, width, _ = frame.shape
-                x, y = int(landmark.x * width), int(landmark.y * height)
+                landmarks[i, :] = (landmark.x, landmark.y, landmark.z)
+                x, y = int(landmarks[i, 0] * width), int(landmarks[i, 1] * height)
                 cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
     return frame
 
