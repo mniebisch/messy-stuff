@@ -49,6 +49,19 @@ class MLPClassifier(nn.Module):
         return x
 
 
+def draw_hand(frame, results):
+    if results.multi_hand_landmarks:
+        for hand_landmarks, handedness in zip(
+            results.multi_hand_landmarks, results.multi_handedness
+        ):
+            handedness_label = handedness.classification[0].label
+            for landmark in hand_landmarks.landmark:
+                height, width, _ = frame.shape
+                x, y = int(landmark.x * width), int(landmark.y * height)
+                cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
+    return frame
+
+
 if __name__ == "__main__":
     # Set the number of features and encoding dimension
     input_size = 3 * 21
@@ -127,15 +140,7 @@ if __name__ == "__main__":
             (0, 255, 0),
             2,
         )
-        if results.multi_hand_landmarks:
-            for hand_landmarks, handedness in zip(
-                results.multi_hand_landmarks, results.multi_handedness
-            ):
-                handedness_label = handedness.classification[0].label
-                for landmark in hand_landmarks.landmark:
-                    height, width, _ = frame.shape
-                    x, y = int(landmark.x * width), int(landmark.y * height)
-                    cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
+        draw_hand(frame, results)
         # Display the frame in a window called "Webcam Feed"
         cv2.imshow("Webcam Feed", frame)
 
