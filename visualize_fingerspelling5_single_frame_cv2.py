@@ -31,8 +31,9 @@ if __name__ == "__main__":
     landmarks = point_data[0]
 
     # Create a white canvas
-    canvas_size = 800
-    canvas = np.ones((canvas_size, canvas_size, 3), dtype=np.uint8) * 255
+    width = 800
+    height = 400
+    canvas = np.ones((height, width, 3), dtype=np.uint8) * 255
 
     # Landmark indices and edges
     edges = [
@@ -77,18 +78,16 @@ if __name__ == "__main__":
         x, y = landmarks[i, :2]
         cv2.circle(
             canvas,
-            (int(x * canvas_size), int(y * canvas_size)),
+            (int(x * width), int(y * height)),
             10 + 2,
             (0, 255, 255),
             -1,
         )
-        cv2.circle(
-            canvas, (int(x * canvas_size), int(y * canvas_size)), 10, (0, 0, 255), -1
-        )
+        cv2.circle(canvas, (int(x * width), int(y * height)), 10, (0, 0, 255), -1)
         cv2.putText(
             canvas,
             str(i),
-            (int(x * canvas_size), int(y * canvas_size) - 10),
+            (int(x * width), int(y * height) - 10),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (0, 0, 0),
@@ -101,8 +100,8 @@ if __name__ == "__main__":
         x2, y2 = landmarks[edge[1], :2]
         cv2.line(
             canvas,
-            (int(x1 * canvas_size), int(y1 * canvas_size)),
-            (int(x2 * canvas_size), int(y2 * canvas_size)),
+            (int(x1 * width), int(y1 * height)),
+            (int(x2 * width), int(y2 * height)),
             (0, 0, 0),
             2,
         )
@@ -116,14 +115,14 @@ if __name__ == "__main__":
             color_bgr = (color_value, 0, 0)  # BGR format
             cv2.circle(
                 canvas,
-                (int(x * canvas_size), int(y * canvas_size)),
+                (int(x * width), int(y * height)),
                 5 + 1,
                 (0, 255, 255),
                 -1,
             )
             cv2.circle(
                 canvas,
-                (int(x * canvas_size), int(y * canvas_size)),
+                (int(x * width), int(y * height)),
                 5,
                 color_bgr,
                 -1,
