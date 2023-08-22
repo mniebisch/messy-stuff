@@ -49,17 +49,14 @@ class MLPClassifier(nn.Module):
         return x
 
 
-def draw_hand(frame, results):
+def draw_hand(frame, landmarks):
     height, width, _ = frame.shape
-    if results.multi_hand_landmarks:
-        landmarks = np.full((21, 3), np.nan, dtype=np.float32)
-        for hand_landmarks in results.multi_hand_landmarks:
-            for i, landmark in enumerate(hand_landmarks.landmark):
-                landmarks[i, :] = (landmark.x, landmark.y, landmark.z)
 
-        for i in range(21):
-            x, y = int(landmarks[i, 0] * width), int(landmarks[i, 1] * height)
-            cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
+    if landmarks.shape != (21, 3):
+        raise ValueError("Landmarks have incorrect shape.")
+    for i in range(21):
+        x, y = int(landmarks[i, 0] * width), int(landmarks[i, 1] * height)
+        cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
     return frame
 
 
@@ -141,7 +138,18 @@ if __name__ == "__main__":
             (0, 255, 0),
             2,
         )
-        draw_hand(frame, results)
+        landmarks = np.full((21, 3), np.nan, dtype=np.float32)
+        if results.multi_hand_landmarks:
+            if len(results.multi_hand_landmarks) > 1:
+                raise ValueError(
+                    "More than hand detected. Configure mp.Hands properly."
+                )
+            # Fill landnmarks with x,y,z values.
+            for hand_landmarks in results.multi_hand_landmarks:
+                for i, landmark in enumerate(hand_landmarks.landmark):
+                    landmarks[i, :] = (landmark.x, landmark.y, landmark.z)
+
+            draw_hand(frame, landmarks)
         # Display the frame in a window called "Webcam Feed"
         cv2.imshow("Webcam Feed", frame)
 
