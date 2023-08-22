@@ -5,6 +5,7 @@ import mediapipe as mp
 import numpy as np
 import torch
 import torch.nn as nn
+from numpy import typing as npt
 
 from fingerspelling_to_pandas_singlehand_landmarks import (
     create_column_map,
@@ -59,6 +60,16 @@ def draw_hand(frame, landmarks):
         x, y = int(landmarks[i, 0] * width), int(landmarks[i, 1] * height)
         cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
     return frame
+
+
+def draw_xz(size: int) -> npt.NDArray:
+    canvas = np.ones((size, size, 3), dtype=np.uint8) * 255
+    return canvas
+
+
+def draw_yz(size: int) -> npt.NDArray:
+    canvas = np.ones((size, size, 3), dtype=np.uint8) * 255
+    return canvas
 
 
 if __name__ == "__main__":
@@ -151,8 +162,14 @@ if __name__ == "__main__":
                     landmarks[i, :] = (landmark.x, landmark.y, landmark.z)
 
             draw_hand_fancy(frame, landmarks)
+
+        canvas_xz = draw_xz(frame.shape[0])
+        canvas_yz = draw_yz(frame.shape[0])
+
+        output_frame = np.concatenate([canvas_xz, frame, canvas_yz], axis=1)
+
         # Display the frame in a window called "Webcam Feed"
-        cv2.imshow("Webcam Feed", frame)
+        cv2.imshow("Webcam Feed", output_frame)
 
         # Wait for the 'q' key to be pressed to exit the loop
         if cv2.waitKey(1) & 0xFF == ord("q"):
