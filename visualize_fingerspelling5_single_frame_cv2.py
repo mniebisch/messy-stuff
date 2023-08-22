@@ -46,19 +46,11 @@ def draw_hand(canvas, landmarks):
 
     # Function to interpolate points between two landmarks
     def interpolate_points(p1, p2, num_points):
-        return np.linspace(p1, p2, num_points + 2)[1:-1]
+        return np.linspace(p1, p2, num_points + 2)  # [1:-1]
 
     # Draw landmarks and edges
     for i in range(21):
         x, y = landmarks[i, :2]
-        cv2.circle(
-            canvas,
-            (int(x * width), int(y * height)),
-            10 + 2,
-            (0, 255, 255),
-            -1,
-        )
-        cv2.circle(canvas, (int(x * width), int(y * height)), 10, (0, 0, 255), -1)
         cv2.putText(
             canvas,
             str(i),
@@ -81,24 +73,27 @@ def draw_hand(canvas, landmarks):
             2,
         )
 
-        interpolated_x = interpolate_points(x1, x2, 8)
-        interpolated_y = interpolate_points(y1, y2, 8)
-        interpolated_values = interpolate_points(values[edge[0]], values[edge[1]], 8)
+        num_interpolation = 1
+        interpolated_x = interpolate_points(x1, x2, num_interpolation)
+        interpolated_y = interpolate_points(y1, y2, num_interpolation)
+        interpolated_values = interpolate_points(
+            values[edge[0]], values[edge[1]], num_interpolation
+        )
 
         for x, y, value in zip(interpolated_x, interpolated_y, interpolated_values):
             color_value = int(255 * (value - cmin) / (cmax - cmin))
-            color_bgr = (color_value, 0, 0)  # BGR format
+            color_bgr = (color_value, color_value, color_value)  # BGR format
             cv2.circle(
                 canvas,
                 (int(x * width), int(y * height)),
-                5 + 1,
+                3 + 1,
                 (0, 255, 255),
                 -1,
             )
             cv2.circle(
                 canvas,
                 (int(x * width), int(y * height)),
-                5,
+                3,
                 color_bgr,
                 -1,
             )
