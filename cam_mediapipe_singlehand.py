@@ -11,6 +11,7 @@ from fingerspelling_to_pandas_singlehand_landmarks import (
     extract_hand_point_cloud,
 )
 from pipeline_fingerspelling5 import generate_hand_landmark_columns
+from visualize_fingerspelling5_single_frame_cv2 import draw_hand as draw_hand_fancy
 
 base_path = pathlib.Path(__file__).parent
 data_path = base_path
@@ -149,7 +150,7 @@ if __name__ == "__main__":
                 for i, landmark in enumerate(hand_landmarks.landmark):
                     landmarks[i, :] = (landmark.x, landmark.y, landmark.z)
 
-            draw_hand(frame, landmarks)
+            draw_hand_fancy(frame, landmarks)
         # Display the frame in a window called "Webcam Feed"
         cv2.imshow("Webcam Feed", frame)
 
