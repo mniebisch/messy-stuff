@@ -14,6 +14,7 @@ from fingerspelling_to_pandas_singlehand_landmarks import (
 from pipeline_fingerspelling5 import generate_hand_landmark_columns
 from visualize_fingerspelling5_single_frame_cv2 import draw_hand as draw_hand_fancy
 from visualize_fingerspelling5_single_frame_cv2_xz import draw_hand_xz
+from visualize_fingerspelling5_single_frame_cv2_yz import draw_hand_yz
 
 base_path = pathlib.Path(__file__).parent
 data_path = base_path
@@ -172,6 +173,7 @@ if __name__ == "__main__":
 
             draw_hand_fancy(frame, landmarks)
             canvas_xz = draw_hand_xz(canvas_xz, landmarks)
+            canvas_yz = draw_hand_yz(canvas_yz, landmarks)
         output_frame = np.concatenate([canvas_xz, frame, canvas_yz], axis=1)
 
         # Display the frame in a window called "Webcam Feed"
