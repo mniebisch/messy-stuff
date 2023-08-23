@@ -13,6 +13,7 @@ from fingerspelling_to_pandas_singlehand_landmarks import (
 )
 from pipeline_fingerspelling5 import generate_hand_landmark_columns
 from visualize_fingerspelling5_single_frame_cv2 import draw_hand as draw_hand_fancy
+from visualize_fingerspelling5_single_frame_cv2_xz import draw_hand_xz
 
 base_path = pathlib.Path(__file__).parent
 data_path = base_path
@@ -62,12 +63,18 @@ def draw_hand(frame, landmarks):
     return frame
 
 
-def draw_xz(size: int) -> npt.NDArray:
+def draw_xz(size: int, landmarks) -> npt.NDArray:
     canvas = np.ones((size, size, 3), dtype=np.uint8) * 255
+    canvas = draw_hand_xz(canvas, landmarks)
     return canvas
 
 
 def draw_yz(size: int) -> npt.NDArray:
+    canvas = np.ones((size, size, 3), dtype=np.uint8) * 255
+    return canvas
+
+
+def create_canvas(size: int) -> npt.NDArray:
     canvas = np.ones((size, size, 3), dtype=np.uint8) * 255
     return canvas
 
@@ -151,6 +158,8 @@ if __name__ == "__main__":
             2,
         )
         landmarks = np.full((21, 3), np.nan, dtype=np.float32)
+        canvas_xz = create_canvas(frame.shape[0])
+        canvas_yz = create_canvas(frame.shape[0])
         if results.multi_hand_landmarks:
             if len(results.multi_hand_landmarks) > 1:
                 raise ValueError(
@@ -162,10 +171,7 @@ if __name__ == "__main__":
                     landmarks[i, :] = (landmark.x, landmark.y, landmark.z)
 
             draw_hand_fancy(frame, landmarks)
-
-        canvas_xz = draw_xz(frame.shape[0])
-        canvas_yz = draw_yz(frame.shape[0])
-
+            canvas_xz = draw_hand_xz(canvas_xz, landmarks)
         output_frame = np.concatenate([canvas_xz, frame, canvas_yz], axis=1)
 
         # Display the frame in a window called "Webcam Feed"
