@@ -2,8 +2,10 @@ import json
 import pathlib
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.colors import Normalize
 
 
 def draw_hand(canvas, landmarks):
@@ -41,8 +43,6 @@ def draw_hand(canvas, landmarks):
     if landmarks.shape != (21, 3):
         raise ValueError("Landmarks have incorrect shape.")
     values = landmarks[:, 2]
-    cmin = -0.5  # min(values)
-    cmax = 0.5  # max(values)
 
     # Function to interpolate points between two landmarks
     def interpolate_points(p1, p2, num_points):
@@ -81,8 +81,21 @@ def draw_hand(canvas, landmarks):
         )
 
         for x, y, value in zip(interpolated_x, interpolated_y, interpolated_values):
-            color_value = int(255 * (value - cmin) / (cmax - cmin))
-            color_bgr = (color_value, color_value, color_value)  # BGR format
+            # Get the 'viridis' colormap
+            viridis_colormap = plt.get_cmap("bwr")
+
+            # Set the minimum and maximum values for your colormap
+            cmap_min = -0.5
+            cmap_max = 0.5
+
+            # Create a normalization object to map values to the colormap range
+            norm = Normalize(vmin=cmap_min, vmax=cmap_max)
+
+            def value_to_rgb(value):
+                rgba = viridis_colormap(norm(value))
+                return tuple((np.array(rgba[:3]) * 255).astype(int))
+
+            color_bgr = value_to_rgb(value)
             cv2.circle(
                 canvas,
                 (int(x * width), int(y * height)),
@@ -94,7 +107,7 @@ def draw_hand(canvas, landmarks):
                 canvas,
                 (int(x * width), int(y * height)),
                 3,
-                color_bgr,
+                (int(color_bgr[0]), int(color_bgr[1]), int(color_bgr[2])),
                 -1,
             )
     return canvas
