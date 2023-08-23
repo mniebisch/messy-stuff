@@ -41,8 +41,8 @@ def draw_hand(canvas, landmarks):
     if landmarks.shape != (21, 3):
         raise ValueError("Landmarks have incorrect shape.")
     values = landmarks[:, 2]
-    cmin = min(values)
-    cmax = max(values)
+    cmin = -0.5  # min(values)
+    cmax = 0.5  # max(values)
 
     # Function to interpolate points between two landmarks
     def interpolate_points(p1, p2, num_points):
