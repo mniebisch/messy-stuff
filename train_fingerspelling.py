@@ -135,6 +135,9 @@ if __name__ == "__main__":
             batch_iterator.set_postfix({"loss": rolling_loss})
         train_acc = eval(model, eval_train_loader, device)
         valid_acc = eval(model, eval_valid_loader, device)
+
+        wandb.log({"train-acc": train_acc, "valid-acc": valid_acc})
+
         print(f"Train acc: {train_acc}, Valid acc: {valid_acc}")
 
     # Save the encoder weights
