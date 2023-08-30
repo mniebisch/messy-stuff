@@ -5,6 +5,7 @@ import mediapipe as mp
 import numpy as np
 import torch
 import torch.nn as nn
+import torch_geometric.transforms as pyg_transforms
 from numpy import typing as npt
 
 from fingerspelling_to_pandas_singlehand_landmarks import (
@@ -104,6 +105,12 @@ if __name__ == "__main__":
 
     landmark_columns = generate_hand_landmark_columns()
 
+    inference_transforms = pyg_transforms.Compose(
+        [
+            pyg_transforms.NormalizeScale(),
+        ]
+    )
+
     # Loop to continuously read frames from the webcam
     while True:
         # Read the current frame from the webcam
@@ -120,6 +127,7 @@ if __name__ == "__main__":
         point_cloud = np.array(
             [column_map[col_name] for col_name in landmark_columns], dtype=np.float32
         )
+        # TODO add inference pipline
         point_cloud = np.nan_to_num(point_cloud)
         point_cloud = point_cloud.reshape(1, -1)
         point_cloud = torch.tensor(point_cloud)
