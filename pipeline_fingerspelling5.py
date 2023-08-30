@@ -1,11 +1,16 @@
 import functools
 import pathlib
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+import torch
+import torch_geometric.data as pyg_data
+import torch_geometric.transforms as pyg_transforms
 import torchdata
 from numpy import typing as npt
+
+import pipeline_pyg_augmentation as geometric_pipe_utils
 
 
 def generate_hand_landmark_columns() -> List[str]:
@@ -60,11 +65,32 @@ def nan_filter(inputs: Tuple[npt.NDArray, int]) -> bool:
     return bool(np.logical_not(np.any(np.isnan(coords))))
 
 
+def landmarks_to_geom_datapoint(
+    inputs: Tuple[npt.NDArray, npt.NDArray]
+) -> pyg_data.Data:
+    landmarks, one_hot = inputs
+    geom_landmarks = geometric_pipe_utils.create_geom_datapoint(
+        torch.from_numpy(landmarks)
+    )
+    # TODO not sure if adding one hot like this is good style
+    geom_landmarks.one_hot = one_hot
+    return geom_landmarks
+
+
+def geom_datapoint_to_landmark(
+    inputs: pyg_data.Data,
+) -> Tuple[npt.NDArray, npt.NDArray]:
+    one_hot = inputs.one_hot
+    landmarks = geometric_pipe_utils.unwrap_pyg_datapoint(inputs)
+    return landmarks.numpy(), one_hot
+
+
 def load_fingerspelling5(
     hand_landmark_data: pd.DataFrame,
     batch_size: int = 64,
     drop_last: bool = True,
     filter_nan: bool = False,
+    geometric_transforms: Optional[pyg_transforms.BaseTransform] = None,
 ):
     num_letters = ord("z") - ord("a") + 1 - 2
 
@@ -88,6 +114,12 @@ def load_fingerspelling5(
         datapipe = datapipe.map(fill_nan)
     datapipe = datapipe.map(map_label)
     datapipe = datapipe.map(one_hot)
+
+    if geometric_transforms is not None:
+        datapipe = datapipe.map(landmarks_to_geom_datapoint)
+        datapipe = datapipe.map(geometric_transforms)
+        datapipe = datapipe.map(geom_datapoint_to_landmark)
+
     datapipe = datapipe.shuffle(buffer_size=100000)
     datapipe = datapipe.batch(batch_size=batch_size, drop_last=drop_last)
     datapipe = datapipe.collate()
@@ -101,6 +133,15 @@ if __name__ == "__main__":
 
     train_data = pd.read_csv(train_csv)
 
-    fu = load_fingerspelling5(train_data, batch_size=64, filter_nan=True)
+    transforms = pyg_transforms.Compose(
+        [
+            pyg_transforms.NormalizeScale(),
+            pyg_transforms.RandomFlip(axis=0, p=0.5),
+        ]
+    )
+
+    fu = load_fingerspelling5(
+        train_data, batch_size=64, filter_nan=True, geometric_transforms=transforms
+    )
     for batch, labels in fu:
         print("oi")
