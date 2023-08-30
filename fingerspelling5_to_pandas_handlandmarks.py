@@ -62,7 +62,7 @@ def process_dataset(dataset_path: pathlib.Path):
             continue
         person = person_dir.name
 
-        for letter_dir in tqdm.tqdm(person_dir.iterdir(), desc="Letters", leave=False):
+        for letter_dir in tqdm.tqdm(person_dir.iterdir(), desc="Letters"):
             if not letter_dir.is_dir():
                 continue
             letter = letter_dir.name
@@ -72,7 +72,7 @@ def process_dataset(dataset_path: pathlib.Path):
                 static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5
             )
 
-            for image in tqdm.tqdm(images, desc="Images", leave=False):
+            for image in tqdm.tqdm(images, desc="Images"):
                 image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 results = mp_hands.process(image_rgb)
                 hand_point_cloud = extract_hand_point_cloud(results)
@@ -84,3 +84,15 @@ def process_dataset(dataset_path: pathlib.Path):
                 data.append(column_map)
 
     return pd.DataFrame(data)
+
+
+if __name__ == "__main__":
+    data_basepath = pathlib.Path.home() / "data"
+    dataset_path = data_basepath / "fingerspelling5"
+
+    output_path = pathlib.Path(__file__).parent / "data"
+    output_file = output_path / "fingerspelling5_hands.csv"
+
+    df = process_dataset(dataset_path=dataset_path)
+    df.to_csv(output_path / "fingerspelling5_hands.csv", index=False)
+    print(f"Saved to {str(output_file)}")
