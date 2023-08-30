@@ -23,6 +23,8 @@ def geometric_augmentation(
 
 
 def create_geom_datapoint(inputs):
+    if inputs.shape != (63,) and inputs.dim() != 1:
+        raise ValueError("Function is not intended to be applied to batched data")
     inputs = torch.reshape(inputs, (-1, 3))
     data = pyg_data.Data(pos=inputs)
     return data
