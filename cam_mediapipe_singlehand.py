@@ -129,7 +129,16 @@ if __name__ == "__main__":
         )
         # TODO add inference pipline
         point_cloud = np.nan_to_num(point_cloud)
+        # normalization START
+        point_cloud = np.reshape(point_cloud, (-1, 3))
+        point_mean = np.mean(point_cloud, axis=-2, keepdims=True)
+        point_cloud = point_cloud - point_mean
+        point_scale = (1 / np.max(np.abs(point_cloud))) * 0.999999
+        point_cloud = point_cloud * point_scale
+        point_cloud = np.reshape(point_cloud, (-1,))
+        # normalization END
         point_cloud = point_cloud.reshape(1, -1)
+
         point_cloud = torch.tensor(point_cloud)
 
         model.eval()
