@@ -22,7 +22,7 @@ def geometric_augmentation(
     return datapipe
 
 
-def create_geom_datapoint(inputs):
+def create_geom_datapoint(inputs: torch.Tensor) -> pyg_data.Data:
     if inputs.shape != (63,) and inputs.dim() != 1:
         raise ValueError("Function is not intended to be applied to batched data")
     inputs = torch.reshape(inputs, (-1, 3))
@@ -30,7 +30,7 @@ def create_geom_datapoint(inputs):
     return data
 
 
-def unwrap_pyg_datapoint(inputs):
+def unwrap_pyg_datapoint(inputs: pyg_data.Data) -> torch.Tensor:
     return torch.reshape(inputs.pos, (-1,))
 
 
