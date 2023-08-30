@@ -20,9 +20,9 @@
     // "editor.rulers": [
     //     88
     // ],
-    // "[python]": {
-    //     "editor.codeActionsOnSave": {
-    //         "source.organizeImports": true
-    //     }
-    // },
+    "[python]": {
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+        }
+    },
 }
