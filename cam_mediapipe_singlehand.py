@@ -5,6 +5,7 @@ import mediapipe as mp
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch_geometric.transforms as pyg_transforms
 from numpy import typing as npt
 
@@ -144,37 +145,40 @@ if __name__ == "__main__":
         model.eval()
         with torch.no_grad():
             prediction = model(point_cloud)
-            prediction = prediction.numpy()
-            prediction = prediction.argmax()
 
-        # show sample point coordinate
-        sample_point = point_cloud[0, 6:9]
-        sample_point = sample_point.tolist()
-        samp_x, samp_y, samp_z = sample_point
-        sample_point_text = f"Sample: ({samp_x:.2f},{samp_y:.2f},{samp_z:.2f})"
-        sample_point_position = (10, 50)
-        cv2.putText(
-            frame,
-            sample_point_text,
-            sample_point_position,
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (255, 255, 0),
-            1,
-        )
+            # Number of elements you want to consider (n)
+            n = 5
 
-        # Display the predicted label alongside the webcam output
-        predicted_label = number_to_letter(prediction)
-        label_position = (10, 30)
-        cv2.putText(
-            frame,
-            f"Predicted: {predicted_label}",
-            label_position,
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (0, 255, 0),
-            2,
-        )
+            # Apply softmax to get pseudo probabilities
+            probabilities = F.softmax(prediction, dim=1)[0]
+            # Convert tensor to NumPy array
+            probabilities_np = probabilities.detach().numpy()
+            prediction = probabilities.argmax()
+
+            # Get indices of the largest n elements
+            largest_indices = np.argsort(probabilities_np)[-n:][::-1]
+
+        # show probs
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.6
+        font_color = (0, 255, 0)
+        y_offset = 25
+
+        for i, idx in enumerate(largest_indices):
+            pseudo_prob = probabilities_np[idx]
+            text = f"{number_to_letter(idx)}, {pseudo_prob:.4f}"
+            font_size = 2 if i == 0 else 1
+
+            cv2.putText(
+                frame,
+                text,
+                (10, y_offset * (i + 1)),
+                font,
+                font_scale,
+                font_color,
+                font_size,
+            )
+
         landmarks = np.full((21, 3), np.nan, dtype=np.float32)
         canvas_xz = create_canvas(frame.shape[0])
         canvas_yz = create_canvas(frame.shape[0])
