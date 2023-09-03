@@ -82,6 +82,7 @@ def geom_datapoint_to_landmark(
 ) -> Tuple[npt.NDArray, npt.NDArray]:
     one_hot = inputs.one_hot
     landmarks = geometric_pipe_utils.unwrap_pyg_datapoint(inputs)
+    # TODO is .numpy() slow?
     return landmarks.numpy(), one_hot
 
 
