@@ -36,13 +36,10 @@ if __name__ == "__main__":
         if transforms is not None:
             datapipe = datapipe.map(create_geom_datapoint)
 
-        if transforms is not None:
-            datapipe = datapipe.map(transforms)
-
         datapipe = datapipe.batch(batch_size=batch_size, drop_last=drop_last_batch)
 
-        # if transforms is not None:
-        #     datapipe = datapipe.map(transforms)
+        if transforms is not None:
+            datapipe = datapipe.map(transforms)
 
         if transforms is not None:
             datapipe = datapipe.collate(collate_fn=collate_pyg_datapoint)
