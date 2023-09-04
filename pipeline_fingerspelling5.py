@@ -86,6 +86,12 @@ def geom_datapoint_to_landmark(
     return landmarks.numpy(), one_hot
 
 
+def custom_collate(inputs: List[pyg_data.Data]) -> Tuple[torch.Tensor, torch.Tensor]:
+    landmarks = geometric_pipe_utils.collate_pyg_datapoint(inputs)
+    one_hot = torch.stack([torch.from_numpy(sample.one_hot) for sample in inputs])
+    return landmarks, one_hot
+
+
 def load_fingerspelling5(
     hand_landmark_data: pd.DataFrame,
     batch_size: int = 64,
@@ -118,12 +124,17 @@ def load_fingerspelling5(
 
     if geometric_transforms is not None:
         datapipe = datapipe.map(landmarks_to_geom_datapoint)
-        datapipe = datapipe.map(geometric_transforms)
-        datapipe = datapipe.map(geom_datapoint_to_landmark)
 
     datapipe = datapipe.shuffle(buffer_size=100000)
     datapipe = datapipe.batch(batch_size=batch_size, drop_last=drop_last)
-    datapipe = datapipe.collate()
+
+    if geometric_transforms is not None:
+        datapipe = datapipe.map(geometric_transforms)
+
+    if geometric_transforms is not None:
+        datapipe = datapipe.collate(collate_fn=custom_collate)
+    else:
+        datapipe = datapipe.collate()
 
     return datapipe
 
