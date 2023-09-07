@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 import torch
 import torch_geometric.data as pyg_data
-import torch_geometric.transforms as pyg_transforms
 import torchdata
 from numpy import typing as npt
+from torchvision import transforms
 
 import pipeline_pyg_augmentation as geometric_pipe_utils
 
@@ -86,12 +86,34 @@ def geom_datapoint_to_landmark(
     return landmarks.numpy(), one_hot
 
 
+class Scale(object):
+    def __call__(self, batch):
+        batch = batch - batch.mean(dim=-2, keepdim=True)
+        scale = (1 / batch.abs().max()) * 0.999999
+        batch = batch * scale
+        return batch
+
+
+class ReshapeToTriple(object):
+    def __call__(self, batch):
+        batch_size = batch.shape[0]
+        batch = batch.reshape((batch_size, -1, 3))
+        return batch
+
+
+class FlattenTriple(object):
+    def __call__(self, batch):
+        batch_size = batch.shape[0]
+        batch = batch.reshape((batch_size, -1))
+        return batch
+
+
 def load_fingerspelling5(
     hand_landmark_data: pd.DataFrame,
     batch_size: int = 64,
     drop_last: bool = True,
     filter_nan: bool = False,
-    geometric_transforms: Optional[pyg_transforms.BaseTransform] = None,
+    transform: Optional[object] = None,
 ):
     num_letters = ord("z") - ord("a") + 1 - 2
 
@@ -116,14 +138,11 @@ def load_fingerspelling5(
     datapipe = datapipe.map(map_label)
     datapipe = datapipe.map(one_hot)
 
-    if geometric_transforms is not None:
-        datapipe = datapipe.map(landmarks_to_geom_datapoint)
-        datapipe = datapipe.map(geometric_transforms)
-        datapipe = datapipe.map(geom_datapoint_to_landmark)
-
     datapipe = datapipe.shuffle(buffer_size=100000)
     datapipe = datapipe.batch(batch_size=batch_size, drop_last=drop_last)
     datapipe = datapipe.collate()
+    if transform is not None:
+        datapipe = datapipe.map(lambda x: (transform(x[0]), x[1]))
 
     return datapipe
 
@@ -134,15 +153,10 @@ if __name__ == "__main__":
 
     train_data = pd.read_csv(train_csv)
 
-    transforms = pyg_transforms.Compose(
-        [
-            pyg_transforms.NormalizeScale(),
-            pyg_transforms.RandomFlip(axis=0, p=0.5),
-        ]
-    )
+    trans = transforms.Compose([ReshapeToTriple(), Scale(), FlattenTriple()])
 
     fu = load_fingerspelling5(
-        train_data, batch_size=64, filter_nan=True, geometric_transforms=transforms
+        train_data, batch_size=64, filter_nan=True, transform=trans
     )
     for batch, labels in fu:
         print("oi")
