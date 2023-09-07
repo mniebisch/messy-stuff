@@ -5,13 +5,18 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch_geometric.transforms as pyg_transforms
 from sklearn.model_selection import GroupShuffleSplit
 from torchdata import dataloader2
+from torchvision import transforms
 from tqdm import tqdm
 
 import wandb
-from pipeline_fingerspelling5 import load_fingerspelling5
+from pipeline_fingerspelling5 import (
+    FlattenTriple,
+    ReshapeToTriple,
+    Scale,
+    load_fingerspelling5,
+)
 
 
 class MLPClassifier(nn.Module):
@@ -86,23 +91,21 @@ if __name__ == "__main__":
 
     filter_nan = True
 
-    train_transforms = pyg_transforms.Compose(
+    train_transforms = transforms.Compose(
         [
-            pyg_transforms.NormalizeScale(),
+            ReshapeToTriple(),
+            Scale(),
+            FlattenTriple(),
         ]
     )
-    eval_transforms = pyg_transforms.Compose(
-        [
-            pyg_transforms.NormalizeScale(),
-        ]
-    )
+    eval_transforms = transforms.Compose([ReshapeToTriple(), Scale(), FlattenTriple()])
 
     train_pipe = load_fingerspelling5(
         train_data,
         batch_size=batch_size,
         drop_last=True,
         filter_nan=filter_nan,
-        geometric_transforms=train_transforms,
+        transform=train_transforms,
     )
     train_loader = dataloader2.DataLoader2(train_pipe)
 
@@ -111,7 +114,7 @@ if __name__ == "__main__":
         batch_size=batch_size,
         drop_last=False,
         filter_nan=filter_nan,
-        geometric_transforms=eval_transforms,
+        transform=eval_transforms,
     )
     eval_train_loader = dataloader2.DataLoader2(
         eval_train_pipe, datapipe_adapter_fn=dataloader2.adapter.Shuffle(enable=False)
@@ -121,7 +124,7 @@ if __name__ == "__main__":
         batch_size=batch_size,
         drop_last=False,
         filter_nan=filter_nan,
-        geometric_transforms=eval_transforms,
+        transform=eval_transforms,
     )
     eval_valid_loader = dataloader2.DataLoader2(
         eval_valid_pipe, datapipe_adapter_fn=dataloader2.adapter.Shuffle(enable=False)

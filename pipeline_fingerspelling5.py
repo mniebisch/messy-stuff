@@ -108,6 +108,11 @@ class FlattenTriple(object):
         return batch
 
 
+def apply_transforms(inputs, transform):
+    landmarks, labels = inputs
+    return transform(landmarks), labels
+
+
 def load_fingerspelling5(
     hand_landmark_data: pd.DataFrame,
     batch_size: int = 64,
@@ -142,7 +147,8 @@ def load_fingerspelling5(
     datapipe = datapipe.batch(batch_size=batch_size, drop_last=drop_last)
     datapipe = datapipe.collate()
     if transform is not None:
-        datapipe = datapipe.map(lambda x: (transform(x[0]), x[1]))
+        trans = functools.partial(apply_transforms, transform=transform)
+        datapipe = datapipe.map(trans)
 
     return datapipe
 
