@@ -106,6 +106,16 @@ class RandomFlip(object):
         return torch.where(mask, -batch, batch)
 
 
+class RandomUniform(object):
+    def __init__(self, translation: float):
+        self.translation = translation
+
+    def __call__(self, batch):
+        noise = torch.zeros_like(batch)
+        noise = noise.uniform_(-self.translation, self.translation)
+        return batch + noise
+
+
 class Scale(object):
     def __call__(self, batch):
         batch = batch - batch.mean(dim=-2, keepdim=True)
@@ -180,7 +190,13 @@ if __name__ == "__main__":
     train_data = pd.read_csv(train_csv)
 
     trans = transforms.Compose(
-        [ReshapeToTriple(), Scale(), RandomFlip(axis=0), FlattenTriple()]
+        [
+            ReshapeToTriple(),
+            Scale(),
+            RandomFlip(axis=0),
+            RandomUniform(0.05),
+            FlattenTriple(),
+        ]
     )
 
     fu = load_fingerspelling5(
