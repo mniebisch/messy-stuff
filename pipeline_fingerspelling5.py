@@ -86,6 +86,26 @@ def geom_datapoint_to_landmark(
     return landmarks.numpy(), one_hot
 
 
+def blub(x):
+    return x
+
+
+class RandomFlip(object):
+    def __init__(self, axis: int, p: float = 0.5):
+        self.axis = axis
+        self.p = p
+
+    def __call__(self, batch):
+        batch_size = batch.shape[0]
+        batch_p = torch.rand(batch_size)
+        mask = torch.zeros_like(batch, dtype=torch.bool)
+
+        mask[batch_p > self.p, :, self.axis] = True
+        mask[batch_p <= self.p, :, self.axis] = False
+
+        return torch.where(mask, -batch, batch)
+
+
 class Scale(object):
     def __call__(self, batch):
         batch = batch - batch.mean(dim=-2, keepdim=True)
@@ -159,7 +179,9 @@ if __name__ == "__main__":
 
     train_data = pd.read_csv(train_csv)
 
-    trans = transforms.Compose([ReshapeToTriple(), Scale(), FlattenTriple()])
+    trans = transforms.Compose(
+        [ReshapeToTriple(), Scale(), RandomFlip(axis=0), FlattenTriple()]
+    )
 
     fu = load_fingerspelling5(
         train_data, batch_size=64, filter_nan=True, transform=trans
