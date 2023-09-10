@@ -92,7 +92,7 @@ if __name__ == "__main__":
     hidden_dim = 128
     output_dim = 24
     model = MLPClassifier(input_dim, hidden_dim, output_dim)
-    model.load_state_dict(torch.load(ckpt_path))
+    model.load_state_dict(torch.load(ckpt_path, map_location=torch.device("cpu")))
 
     # Initialize the MediaPipe solutions
     mp_hands = mp.solutions.hands.Hands(
@@ -136,6 +136,7 @@ if __name__ == "__main__":
         point_cloud = point_cloud - point_mean
         point_scale = (1 / np.max(np.abs(point_cloud))) * 0.999999
         point_cloud = point_cloud * point_scale
+        point_coords = point_cloud
         point_cloud = np.reshape(point_cloud, (-1,))
         # normalization END
         point_cloud = point_cloud.reshape(1, -1)
@@ -196,6 +197,46 @@ if __name__ == "__main__":
             canvas_xz = draw_hand_xz(canvas_xz, landmarks)
             canvas_yz = draw_hand_yz(canvas_yz, landmarks)
         output_frame = np.concatenate([canvas_xz, frame, canvas_yz], axis=1)
+
+        # show additional information
+        _, output_width, _ = output_frame.shape
+
+        bottom_canvas_height = 100
+
+        bottom_canvas = (
+            np.ones((bottom_canvas_height, output_width, 3), dtype=np.uint8) * 255
+        )
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.6
+        font_color = (0, 0, 0)
+        y_offset = 25
+        font_size = 1
+
+        x_diff = point_coords[12, 0] - point_coords[8, 0]
+        text = f"(x_12 - x_8): {x_diff:.8f}"
+        cv2.putText(
+            bottom_canvas,
+            text,
+            (100, 20),
+            font,
+            font_scale,
+            font_color,
+            font_size,
+        )
+
+        z_diff = point_coords[12, 2] - point_coords[8, 2]
+        text = f"(z_12 - z_8): {z_diff:.8f}"
+        cv2.putText(
+            bottom_canvas,
+            text,
+            (100, 40),
+            font,
+            font_scale,
+            font_color,
+            font_size,
+        )
+
+        output_frame = np.concatenate([output_frame, bottom_canvas], axis=0)
 
         # Display the frame in a window called "Webcam Feed"
         cv2.imshow("Webcam Feed", output_frame)
