@@ -9,10 +9,16 @@ import torch.nn as nn
 from numpy import typing as npt
 from sklearn import metrics
 from torchdata import dataloader2
+from torchvision import transforms
 from tqdm import tqdm
 
 from cam_mediapipe_singlehand import number_to_letter
-from pipeline_fingerspelling5 import load_fingerspelling5
+from pipeline_fingerspelling5 import (
+    FlattenTriple,
+    ReshapeToTriple,
+    Scale,
+    load_fingerspelling5,
+)
 
 
 class MLPClassifier(nn.Module):
@@ -89,14 +95,24 @@ if __name__ == "__main__":
     train_data = landmark_data.loc[train_index]
     valid_data = landmark_data.loc[val_index]
 
+    eval_transforms = transforms.Compose([ReshapeToTriple(), Scale(), FlattenTriple()])
+
     eval_train_pipe = load_fingerspelling5(
-        train_data, batch_size=batch_size, drop_last=False, filter_nan=filter_nan
+        train_data,
+        batch_size=batch_size,
+        drop_last=False,
+        filter_nan=filter_nan,
+        transform=eval_transforms,
     )
     eval_train_loader = dataloader2.DataLoader2(
         eval_train_pipe, datapipe_adapter_fn=dataloader2.adapter.Shuffle(enable=False)
     )
     eval_valid_pipe = load_fingerspelling5(
-        valid_data, batch_size=batch_size, drop_last=False, filter_nan=filter_nan
+        valid_data,
+        batch_size=batch_size,
+        drop_last=False,
+        filter_nan=filter_nan,
+        transform=eval_transforms,
     )
     eval_valid_loader = dataloader2.DataLoader2(
         eval_valid_pipe, datapipe_adapter_fn=dataloader2.adapter.Shuffle(enable=False)
