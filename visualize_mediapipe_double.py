@@ -354,6 +354,13 @@ def column_map_to_point_cloud(column_map: Dict[str, float]) -> npt.NDArray:
     return np.reshape(point_cloud, (-1, 3))
 
 
+def normalize_point_cloud(point_cloud: npt.NDArray) -> npt.NDArray:
+    point_mean = np.mean(point_cloud, axis=-2, keepdims=True)
+    point_cloud = point_cloud - point_mean
+    point_scale = (1 / np.max(np.abs(point_cloud))) * 0.999999
+    return point_cloud * point_scale
+
+
 if __name__ == "__main__":
     # Initialize the MediaPipe solutions
     mp_hands = mp.solutions.hands.Hands(
@@ -383,18 +390,11 @@ if __name__ == "__main__":
         point_cloud = column_map_to_point_cloud(column_map)
         # TODO add inference pipline
         point_cloud = np.nan_to_num(point_cloud)
-        # normalization START
-        point_cloud_raw = point_cloud
-        point_mean = np.mean(point_cloud, axis=-2, keepdims=True)
-        point_cloud = point_cloud - point_mean
-        point_scale = (1 / np.max(np.abs(point_cloud))) * 0.999999
-        point_cloud = point_cloud * point_scale
-        point_coords = point_cloud
-        # normalization END
 
-        # extract cropped hand START
+        point_cloud_raw = point_cloud
+        point_coords = normalize_point_cloud(point_cloud)
+
         cropped_hand = crop_hand(frame=frame, point_coords=point_cloud_raw)
-        # extract croppend hand end
 
         landmarks = np.full((21, 3), np.nan, dtype=np.float32)
         canvas_xz = create_canvas(frame.shape[0])
