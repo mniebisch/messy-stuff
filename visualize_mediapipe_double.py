@@ -360,6 +360,24 @@ def normalize_point_cloud(point_cloud: npt.NDArray) -> npt.NDArray:
     return point_cloud * point_scale
 
 
+def extract_hand_landmarks(
+    hand_result: mp.solutions.hands.Hands,
+) -> npt.NDArray:
+    """
+    VERY similar to
+    extract_hand_point_cloud from fingerspelling_to_pandas_singlehand_landmarks
+    """
+    landmarks = np.full((21, 3), np.nan, dtype=np.float32)
+    if hand_result.multi_hand_landmarks:
+        if len(hand_result.multi_hand_landmarks) > 1:
+            raise ValueError("More than hand detected. Configure mp.Hands properly.")
+        # Fill landnmarks with x,y,z values.
+        for hand_landmarks in hand_result.multi_hand_landmarks:
+            for i, landmark in enumerate(hand_landmarks.landmark):
+                landmarks[i, :] = (landmark.x, landmark.y, landmark.z)
+    return landmarks
+
+
 if __name__ == "__main__":
     # Initialize the MediaPipe solutions
     mp_hands = mp.solutions.hands.Hands(
@@ -394,19 +412,10 @@ if __name__ == "__main__":
 
         cropped_hand = crop_hand(frame=frame, point_coords=point_cloud_raw)
 
-        landmarks = np.full((21, 3), np.nan, dtype=np.float32)
         canvas_xz = create_canvas(frame.shape[0])
         canvas_yz = create_canvas(frame.shape[0])
-        if results.multi_hand_landmarks:
-            if len(results.multi_hand_landmarks) > 1:
-                raise ValueError(
-                    "More than hand detected. Configure mp.Hands properly."
-                )
-            # Fill landnmarks with x,y,z values.
-            for hand_landmarks in results.multi_hand_landmarks:
-                for i, landmark in enumerate(hand_landmarks.landmark):
-                    landmarks[i, :] = (landmark.x, landmark.y, landmark.z)
-
+        landmarks = extract_hand_landmarks(results)
+        if not np.any(np.isnan(landmarks)):
             draw_hand_fancy(frame, landmarks)
             # canvas_xz = draw_hand_xz(canvas_xz, landmarks)
             canvas_xz = draw_hand_xz(canvas_xz, point_coords)
