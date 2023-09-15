@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Dict, Tuple
 
 import cv2
 import mediapipe as mp
@@ -347,6 +347,13 @@ def crop_hand(frame, point_coords):
     return resized_padded_image
 
 
+def column_map_to_point_cloud(column_map: Dict[str, float]) -> npt.NDArray:
+    point_cloud = np.array(
+        [column_map[col_name] for col_name in landmark_columns], dtype=np.float32
+    )
+    return np.reshape(point_cloud, (-1, 3))
+
+
 if __name__ == "__main__":
     # Initialize the MediaPipe solutions
     mp_hands = mp.solutions.hands.Hands(
@@ -373,13 +380,10 @@ if __name__ == "__main__":
         hand_point_cloud = extract_hand_point_cloud(results)
         column_map = create_column_map(hand_point_cloud)
 
-        point_cloud = np.array(
-            [column_map[col_name] for col_name in landmark_columns], dtype=np.float32
-        )
+        point_cloud = column_map_to_point_cloud(column_map)
         # TODO add inference pipline
         point_cloud = np.nan_to_num(point_cloud)
         # normalization START
-        point_cloud = np.reshape(point_cloud, (-1, 3))
         point_cloud_raw = point_cloud
         point_mean = np.mean(point_cloud, axis=-2, keepdims=True)
         point_cloud = point_cloud - point_mean
