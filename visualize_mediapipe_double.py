@@ -1,4 +1,3 @@
-import pathlib
 from typing import Tuple
 
 import cv2
@@ -13,13 +12,6 @@ from fingerspelling_to_pandas_singlehand_landmarks import (
 )
 from pipeline_fingerspelling5 import generate_hand_landmark_columns
 from visualize_fingerspelling5_single_frame_cv2 import draw_hand as draw_hand_fancy
-
-base_path = pathlib.Path(__file__).parent
-data_path = base_path
-
-train_csv = data_path / "output.csv"
-ckpt_file = "encoder_weights.pth"
-ckpt_path = base_path / ckpt_file
 
 
 def map_values(val: float, size: int) -> int:
@@ -394,11 +386,7 @@ if __name__ == "__main__":
         point_scale = (1 / np.max(np.abs(point_cloud))) * 0.999999
         point_cloud = point_cloud * point_scale
         point_coords = point_cloud
-        point_cloud = np.reshape(point_cloud, (-1,))
         # normalization END
-        point_cloud = point_cloud.reshape(1, -1)
-
-        point_cloud = torch.tensor(point_cloud)
 
         # extract cropped hand START
         cropped_hand = crop_hand(frame=frame, point_coords=point_cloud_raw)
