@@ -417,9 +417,7 @@ if __name__ == "__main__":
         landmarks = extract_hand_landmarks(results)
         if not np.any(np.isnan(landmarks)):
             draw_hand_fancy(frame, landmarks)
-            # canvas_xz = draw_hand_xz(canvas_xz, landmarks)
             canvas_xz = draw_hand_xz(canvas_xz, point_coords)
-            # canvas_yz = draw_hand_yz(canvas_yz, landmarks)
             canvas_yz = draw_hand_yz(canvas_yz, point_coords)
         output_frame = np.concatenate([canvas_xz, frame, canvas_yz], axis=1)
 
