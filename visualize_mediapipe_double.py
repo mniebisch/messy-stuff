@@ -3,7 +3,6 @@ from typing import Dict, Tuple
 import cv2
 import mediapipe as mp
 import numpy as np
-import torch
 from numpy import typing as npt
 
 from fingerspelling_to_pandas_singlehand_landmarks import (
@@ -388,7 +387,6 @@ if __name__ == "__main__":
         column_map = create_column_map(hand_point_cloud)
 
         point_cloud = column_map_to_point_cloud(column_map)
-        # TODO add inference pipline
         point_cloud = np.nan_to_num(point_cloud)
 
         point_cloud_raw = point_cloud
