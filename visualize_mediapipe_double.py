@@ -1,3 +1,4 @@
+import copy
 from typing import Dict, Tuple
 
 import cv2
@@ -378,9 +379,20 @@ def extract_hand_landmarks(
     return landmarks
 
 
+def transform_hand_results(results) -> npt.NDArray:
+    hand_point_cloud = extract_hand_point_cloud(results)
+    column_map = create_column_map(hand_point_cloud)
+
+    point_cloud = column_map_to_point_cloud(column_map)
+    return np.nan_to_num(point_cloud)
+
+
 if __name__ == "__main__":
     # Initialize the MediaPipe solutions
     mp_hands = mp.solutions.hands.Hands(
+        static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5
+    )
+    mp_hands_cropped = mp.solutions.hands.Hands(
         static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5
     )
 
@@ -395,22 +407,17 @@ if __name__ == "__main__":
     while True:
         # Read the current frame from the webcam
         ret, frame = video_capture.read()
+        frame_raw = copy.deepcopy(frame)
 
         # Convert the frame to RGB format
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # Detect faces, facial landmarks, gestures, and pose landmarks in the frame
         results = mp_hands.process(frame_rgb)
-        hand_point_cloud = extract_hand_point_cloud(results)
-        column_map = create_column_map(hand_point_cloud)
-
-        point_cloud = column_map_to_point_cloud(column_map)
-        point_cloud = np.nan_to_num(point_cloud)
+        point_cloud = transform_hand_results(results)
 
         point_cloud_raw = point_cloud
         point_coords = normalize_point_cloud(point_cloud)
-
-        cropped_hand = crop_hand(frame=frame, point_coords=point_cloud_raw)
 
         canvas_xz = create_canvas(frame.shape[0])
         canvas_yz = create_canvas(frame.shape[0])
@@ -422,8 +429,19 @@ if __name__ == "__main__":
         output_frame = np.concatenate([canvas_xz, frame, canvas_yz], axis=1)
 
         # create cropped/zoomed comparison canvas
+        cropped_hand = crop_hand(frame=frame_raw, point_coords=point_cloud_raw)
+        cropped_hand_rgb = crop_hand(frame=frame_rgb, point_coords=point_cloud_raw)
+
+        results_cropped = mp_hands_cropped.process(cropped_hand_rgb)
+        point_cloud_cropped = transform_hand_results(results_cropped)
+        point_cloud_cropped = normalize_point_cloud(point_cloud_cropped)
         canvas_xz = create_canvas(frame.shape[0])
         canvas_yz = create_canvas(frame.shape[0])
+        landmarks_cropped = extract_hand_landmarks(results_cropped)
+        if not np.any(np.isnan(landmarks_cropped)):
+            draw_hand_fancy(cropped_hand, landmarks_cropped)
+            canvas_xz = draw_hand_xz(canvas_xz, point_cloud_cropped)
+            canvas_yz = draw_hand_yz(canvas_yz, point_cloud_cropped)
         compare_canvas = np.concatenate([canvas_xz, cropped_hand, canvas_yz], axis=1)
 
         output_frame = np.concatenate([output_frame, compare_canvas], axis=0)
