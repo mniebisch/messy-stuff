@@ -486,6 +486,13 @@ if __name__ == "__main__":
 
         output_frame = np.concatenate([output_frame, bottom_canvas], axis=0)
 
+        # resize image
+        scaling_factor = 0.65
+        img_height, img_width, _ = output_frame.shape
+        scale_height = int(img_height * scaling_factor)
+        scale_width = int(img_width * scaling_factor)
+        output_frame = cv2.resize(output_frame, (scale_width, scale_height))
+
         # Display the frame in a window called "Webcam Feed"
         cv2.imshow("Webcam Feed", output_frame)
 
