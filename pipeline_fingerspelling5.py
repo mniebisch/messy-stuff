@@ -138,6 +138,52 @@ class FlattenTriple(object):
         return batch
 
 
+class RandomRotate(object):
+    def __init__(self, degree: float, axis: int) -> None:
+        self.degree = degree
+        self.axis = axis
+
+    def __call__(self, batch: torch.Tensor):
+        batch_size, spatial_dim, _ = batch.shape
+
+        matrix_element_dim = (batch_size, 1, 1)
+
+        degrees = torch.zeros(matrix_element_dim, dtype=batch.dtype)
+        degrees = torch.pi * degrees.uniform_(-self.degree, self.degree) / 180.0
+        sin, cos = torch.sin(degrees), torch.cos(degrees)
+
+        zero = torch.zeros(matrix_element_dim, dtype=batch.dtype)
+        one = torch.ones(matrix_element_dim, dtype=batch.dtype)
+
+        if spatial_dim == 2:
+            rows = [
+                torch.cat([cos, sin], dim=2),
+                torch.cat([-sin, cos], dim=2),
+            ]
+        else:
+            if self.axis == 0:
+                rows = [
+                    torch.cat([one, zero, zero], dim=2),
+                    torch.cat([zero, cos, sin], dim=2),
+                    torch.cat([zero, -sin, cos], dim=2),
+                ]
+
+            elif self.axis == 1:
+                rows = [
+                    torch.cat([cos, zero, -sin], dim=2),
+                    torch.cat([zero, one, zero], dim=2),
+                    torch.cat([sin, zero, cos], dim=2),
+                ]
+            else:
+                rows = [
+                    torch.cat([cos, sin, zero], dim=2),
+                    torch.cat([-sin, cos, zero], dim=2),
+                    torch.cat([zero, zero, one], dim=2),
+                ]
+        matrix = torch.cat(rows, dim=1)
+        return torch.matmul(batch, matrix)
+
+
 def apply_transforms(inputs, transform):
     landmarks, labels = inputs
     return transform(landmarks), labels
