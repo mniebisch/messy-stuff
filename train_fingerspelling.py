@@ -14,6 +14,7 @@ import wandb
 from pipeline_fingerspelling5 import (
     FlattenTriple,
     RandomFlip,
+    RandomRotate,
     RandomUniform,
     ReshapeToTriple,
     Scale,
@@ -99,6 +100,9 @@ if __name__ == "__main__":
             Scale(),
             RandomFlip(axis=0),
             RandomUniform(0.05),
+            RandomRotate(degree=20, axis=0),
+            RandomRotate(degree=20, axis=1),
+            RandomRotate(degree=20, axis=2),
             FlattenTriple(),
         ]
     )
