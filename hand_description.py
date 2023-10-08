@@ -1,7 +1,11 @@
+import collections
+
 import numpy as np
 from numpy import typing as npt
 
 __all__ = ["compute_knuckle_direction", "compute_palm_direction"]
+
+AngleSummary = collections.namedtuple("AngleSummary", "xy yz xz")
 
 
 def compute_knuckle_direction(hand: npt.NDArray) -> tuple[float, float, float]:
@@ -28,6 +32,20 @@ def compute_palm_direction(hand: npt.NDArray) -> tuple[float, float, float]:
 
     palm_direction = np.cross(wrist_index_direction, wrist_pinky_direction)
     return tuple(palm_direction)
+
+
+def describe_angles(v1: npt.NDArray, v2: npt.NDArray) -> AngleSummary:
+    if v1.shape != (3,) or v2.shape != (3,):
+        raise ValueError("Vectors with incorrect shape.")
+
+    xy_ind = [0, 1]
+    xz_ind = [0, 2]
+    yz_ind = [1, 2]
+
+    xy_angle = angle_between(v1[xy_ind], v2[xy_ind])
+    xz_angle = angle_between(v1[xz_ind], v2[xz_ind])
+    yz_angle = angle_between(v1[yz_ind], v2[yz_ind])
+    return AngleSummary(xy_angle, yz_angle, xz_angle)
 
 
 def unit_vector(vector: npt.NDArray) -> npt.NDArray:
