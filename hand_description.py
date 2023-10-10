@@ -3,7 +3,7 @@ import collections
 import numpy as np
 from numpy import typing as npt
 
-__all__ = ["compute_knuckle_direction", "compute_palm_direction"]
+__all__ = ["compute_knuckle_direction", "compute_hand_mean", "compute_palm_direction"]
 
 AngleSummary = collections.namedtuple("AngleSummary", "xy yz xz")
 
@@ -49,6 +49,9 @@ def describe_angles(v1: npt.NDArray, v2: npt.NDArray) -> AngleSummary:
 
 
 def compute_hand_mean(hand: npt.NDArray, part: str = "all") -> npt.NDArray:
+    if hand.shape != (21, 3):
+        raise ValueError("Incorrect landmark shape.")
+
     parts = {
         "all": list(range(21)),
         "thumb": [1, 2, 3, 4],
