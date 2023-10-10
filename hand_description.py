@@ -3,7 +3,12 @@ import collections
 import numpy as np
 from numpy import typing as npt
 
-__all__ = ["compute_knuckle_direction", "compute_hand_mean", "compute_palm_direction"]
+__all__ = [
+    "compute_hand_mean",
+    "compute_hand_std",
+    "compute_knuckle_direction",
+    "compute_palm_direction",
+]
 
 AngleSummary = collections.namedtuple("AngleSummary", "xy yz xz")
 
@@ -62,6 +67,22 @@ def compute_hand_mean(hand: npt.NDArray, part: str = "all") -> npt.NDArray:
     }
     indices = parts[part]
     return np.mean(hand[indices], axis=0)
+
+
+def compute_hand_std(hand: npt.NDArray, part: str = "all") -> npt.NDArray:
+    if hand.shape != (21, 3):
+        raise ValueError("Incorrect landmark shape.")
+
+    parts = {
+        "all": list(range(21)),
+        "thumb": [1, 2, 3, 4],
+        "index_finger": [5, 6, 7, 8],
+        "middle_finger": [9, 10, 11, 12],
+        "ring_finger": [13, 14, 15, 16],
+        "pinky": [17, 18, 19, 20],
+    }
+    indices = parts[part]
+    return np.std(hand[indices], axis=0)
 
 
 def unit_vector(vector: npt.NDArray) -> npt.NDArray:
