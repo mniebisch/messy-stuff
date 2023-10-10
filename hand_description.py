@@ -48,6 +48,19 @@ def describe_angles(v1: npt.NDArray, v2: npt.NDArray) -> AngleSummary:
     return AngleSummary(xy_angle, yz_angle, xz_angle)
 
 
+def compute_hand_mean(hand: npt.NDArray, part: str = "all") -> npt.NDArray:
+    parts = {
+        "all": list(range(21)),
+        "thumb": [1, 2, 3, 4],
+        "index_finger": [5, 6, 7, 8],
+        "middle_finger": [9, 10, 11, 12],
+        "ring_finger": [13, 14, 15, 16],
+        "pinky": [17, 18, 19, 20],
+    }
+    indices = parts[part]
+    return np.mean(hand[indices], axis=0)
+
+
 def unit_vector(vector: npt.NDArray) -> npt.NDArray:
     """Returns the unit vector of the vector."""
     return vector / np.linalg.norm(vector)
