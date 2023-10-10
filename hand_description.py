@@ -2,8 +2,10 @@ import collections
 
 import numpy as np
 from numpy import typing as npt
+from scipy.spatial import distance
 
 __all__ = [
+    "compute_distance_adjacency",
     "compute_hand_mean",
     "compute_hand_std",
     "compute_knuckle_direction",
@@ -51,6 +53,14 @@ def describe_angles(v1: npt.NDArray, v2: npt.NDArray) -> AngleSummary:
     xz_angle = angle_between(v1[xz_ind], v2[xz_ind])
     yz_angle = angle_between(v1[yz_ind], v2[yz_ind])
     return AngleSummary(xy_angle, yz_angle, xz_angle)
+
+
+def compute_distance_adjacency(hand: npt.NDArray, dim: str = "all") -> npt.NDArray:
+    dims = {"all": [0, 1, 2], "x": [0], "y": [1], "z": [2]}
+    dim_indices = dims[dim]
+    if hand.shape != (21, 3):
+        raise ValueError("Incorrect landmark shape.")
+    return distance.cdist(hand[:, dim_indices], hand[dim_indices], metric="euclidean")
 
 
 def compute_hand_mean(hand: npt.NDArray, part: str = "all") -> npt.NDArray:
