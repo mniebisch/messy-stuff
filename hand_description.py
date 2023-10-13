@@ -5,6 +5,7 @@ from numpy import typing as npt
 from scipy.spatial import distance
 
 __all__ = [
+    "compute_extend",
     "compute_distance_adjacency",
     "compute_hand_mean",
     "compute_hand_std",
@@ -13,6 +14,16 @@ __all__ = [
 ]
 
 AngleSummary = collections.namedtuple("AngleSummary", "xy yz xz")
+
+
+def compute_extend(hand: npt.NDArray) -> tuple[float, float, float]:
+    if hand.shape != (21, 3):
+        raise ValueError("Incorrect landmark shape.")
+
+    min_vals = np.min(hand, axis=0)
+    max_vals = np.max(hand, axis=0)
+    extend = np.abs(max_vals - min_vals)
+    return tuple(extend)
 
 
 def compute_knuckle_direction(hand: npt.NDArray) -> tuple[float, float, float]:
