@@ -2,6 +2,7 @@ import collections
 
 import numpy as np
 from numpy import typing as npt
+from scipy import spatial
 from scipy.spatial import distance
 
 __all__ = [
@@ -11,9 +12,12 @@ __all__ = [
     "compute_hand_std",
     "compute_knuckle_direction",
     "compute_palm_direction",
+    "compute_plane_shape_stats",
 ]
 
 AngleSummary = collections.namedtuple("AngleSummary", "xy yz xz")
+PolygonStats = collections.namedtuple("PolygonStats", "area perimeter")
+Planes = collections.namedtuple("Planes", "xy yz xz")
 
 
 def compute_extend(hand: npt.NDArray) -> tuple[float, float, float]:
@@ -106,6 +110,22 @@ def compute_hand_std(hand: npt.NDArray, part: str = "all") -> npt.NDArray:
     return np.std(hand[indices], axis=0)
 
 
+def compute_polygon_stats(polygon: spatial.ConvexHull) -> PolygonStats:
+    area = shoelace_formula(polygon.points[polygon.vertices])
+    perimeter = polygon.area
+    return PolygonStats(area, perimeter)
+
+
+def compute_plane_shape_stats(hand: npt.NDArray) -> Planes[PolygonStats]:
+    if hand.shape != (21, 3):
+        raise ValueError("Incorrect landmark shape.")
+
+    stats_xy = compute_polygon_stats(spatial.ConvexHull(hand[:, :2]))
+    stats_yz = compute_polygon_stats(spatial.ConvexHull(hand[:, 1:]))
+    stats_xz = compute_polygon_stats(spatial.ConvexHull(hand[:, [0, 2]]))
+    return Planes(stats_xy, stats_yz, stats_xz)
+
+
 def unit_vector(vector: npt.NDArray) -> npt.NDArray:
     """Returns the unit vector of the vector."""
     return vector / np.linalg.norm(vector)
@@ -126,3 +146,47 @@ def angle_between(v1: npt.NDArray, v2: npt.NDArray) -> float:
     v1_u = unit_vector(v1)
     v2_u = unit_vector(v2)
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
+
+def shoelace_formula(vertices: npt.NDArray) -> float:
+    """
+    Compute the area of a 2D convex polygon using the shoelace formula.
+
+    The shoelace formula calculates the area of a polygon by summing the products
+    of the coordinates of adjacent vertices and then dividing by 2.
+
+    Requirements:
+    1. Convexity: The polygon should be convex. For concave polygons, split them
+       into multiple convex polygons for accurate results.
+    2. Vertex Order: Vertices must be specified in either clockwise or
+       counterclockwise order.
+    3. Closed Polygon: Ensure that the first and last vertices of the array are
+       the same to close the polygon.
+    4. Non-Self-Intersecting: The polygon should not have any self-intersections.
+    5. Non-Negative Area: The result will be positive if vertices are ordered
+       counterclockwise, and negative if ordered clockwise. To ensure a positive
+       result, order the vertices counterclockwise.
+    6. No Duplicates: Vertices should not contain duplicate points.
+
+    Parameters:
+        vertices (npt.NDArray): Array of shape [N x 2] representing the vertices
+            of the polygon.
+
+    Returns:
+        float: Area of the convex polygon.
+
+    Example:
+        >>> polygon_vertices = np.array([[0, 0], [4, 0], [4, 3], [1, 2]])
+        >>> area = shoelace_formula(polygon_vertices)
+        >>> print(f"The area of the polygon is {area}")
+    """
+
+    if vertices.shape[1] != 2:
+        raise ValueError("Function only holds for 2D space.")
+
+    if vertices.shape[0] < 3:
+        raise ValueError("A polygon must have at least three vertices.")
+
+    x = vertices[:, 0]
+    y = vertices[:, 1]
+    return 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
