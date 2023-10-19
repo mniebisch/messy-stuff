@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 from numpy import typing as npt
 from plotly.subplots import make_subplots
+from scipy import spatial
 
 
 def angle_between_vectors(a: npt.NDArray, b: npt.NDArray) -> float:
@@ -29,12 +30,6 @@ origin = [0, 0, 0]
 point1 = [1, 1, 1]
 point2 = [2, -1, 0]
 
-df_raw = [
-    vals + [label]
-    for vals, label in zip([origin, point1, origin, point2], ["v1", "v1", "v2", "v2"])
-]
-df = pd.DataFrame(df_raw, columns=["x", "y", "z", "line"])
-
 vector1 = np.array(point1) - np.array(origin)
 vector2 = np.array(point2) - np.array(origin)
 
@@ -50,6 +45,32 @@ print("xy angle", angle_xy)
 print("yz angle", angle_yz)
 print("xz angle", angle_xz)
 
+identity = np.diag(np.full(3, 1))
+rotation = spatial.transform.Rotation.from_matrix(identity)
+
+vector1 = vector1.reshape((1, 3))
+vector2 = vector2.reshape((1, 3))
+
+rotation, _ = rotation.align_vectors(vector1, vector2)
+
+vector1_rotated = np.dot(vector1, rotation.as_matrix())
+
+point1_rotated = vector1_rotated.flatten().tolist()
+
+
+df_rotated = [
+    vals + [label]
+    for vals, label in zip(
+        [origin, point1_rotated],
+        ["v1_rot", "v1_rot"],
+    )
+]
+
+df_raw = [
+    vals + [label]
+    for vals, label in zip([origin, point1, origin, point2], ["v1", "v1", "v2", "v2"])
+]
+df = pd.DataFrame(df_raw + df_rotated, columns=["x", "y", "z", "line"])
 
 fig_xy = px.line(df, x="x", y="y", color="line")
 fig_xz = px.line(df, x="x", y="z", color="line")
