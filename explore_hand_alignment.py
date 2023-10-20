@@ -1,7 +1,12 @@
+import pathlib
+
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 from numpy import typing as npt
 from plotly.subplots import make_subplots
+
+import alignment
 
 
 def add_hand_2d(
@@ -125,29 +130,46 @@ def add_hand_3d(figure: go.Figure, hand: npt.NDArray, color: str) -> None:
         )
 
 
+# Load dataset
+data_path = pathlib.Path(__file__).parent / "data"
+fingerspelling_landmark_csv = data_path / "fingerspelling5_singlehands.csv"
+landmark_data = pd.read_csv(fingerspelling_landmark_csv)
+
+person_data = landmark_data.loc[landmark_data["person"] == "C"]
+letter_data = person_data.loc[person_data["letter"] == "l"]
+letter_data = letter_data.reset_index()
+ind = 340
+frame_data = letter_data.iloc[ind]
+value_indices = ["hand" in column for column in frame_data.index]
+
+hand_data = frame_data[value_indices].values
+hand_data = hand_data.reshape((21, 3))
+
+hand_data = alignment.scale_hand(hand_data)
+
 # TODO load actual landmarks
-hand_landmarks = np.random.rand(21, 3) * 100  # Replace this with your actual data
 # TODO describe 'desired' knuckle line
 # TODO describe 'desired' palm normal
 # TODO create rotation matrix
 # TODO compute rotated landmarks
 hand_landmarks2 = np.random.rand(21, 3) * 100  # Replace this with your actual data
+hand_landmarks2 = alignment.scale_hand(hand_landmarks2)
 
 
 scatter_3d = go.Figure()
-add_hand_3d(scatter_3d, hand_landmarks, "red")
+add_hand_3d(scatter_3d, hand_data, "red")
 add_hand_3d(scatter_3d, hand_landmarks2, "blue")
 
 scatter_xy = go.Figure()
-add_hand_2d(scatter_xy, hand_landmarks, x_axis=0, y_axis=1, color="red")
+add_hand_2d(scatter_xy, hand_data, x_axis=0, y_axis=1, color="red")
 add_hand_2d(scatter_xy, hand_landmarks2, x_axis=0, y_axis=1, color="blue")
 
 scatter_yz = go.Figure()
-add_hand_2d(scatter_yz, hand_landmarks, x_axis=2, y_axis=1, color="red")
+add_hand_2d(scatter_yz, hand_data, x_axis=2, y_axis=1, color="red")
 add_hand_2d(scatter_yz, hand_landmarks2, x_axis=2, y_axis=1, color="blue")
 
 scatter_xz = go.Figure()
-add_hand_2d(scatter_xz, hand_landmarks, x_axis=0, y_axis=2, color="red")
+add_hand_2d(scatter_xz, hand_data, x_axis=0, y_axis=2, color="red")
 add_hand_2d(scatter_xz, hand_landmarks2, x_axis=0, y_axis=2, color="blue")
 
 # Create subplots
@@ -182,8 +204,8 @@ for trace_ind in range(len(scatter_3d["data"])):
 fig.update_layout(title="Explore alignment", height=1500, width=1500)
 
 for col_ind, x_title, y_title in zip([1, 2, 3], ["x", "x", "z"], ["y", "z", "y"]):
-    fig.update_xaxes(range=[0, 100], row=1, col=col_ind, title_text=x_title)
-    fig.update_yaxes(range=[0, 100], row=1, col=col_ind, title_text=y_title)
+    fig.update_xaxes(range=[-1, 1], row=1, col=col_ind, title_text=x_title)
+    fig.update_yaxes(range=[-1, 1], row=1, col=col_ind, title_text=y_title)
 
 # Show the figure
 fig.show()
