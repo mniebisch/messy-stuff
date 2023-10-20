@@ -2,11 +2,20 @@ import numpy as np
 from numpy import typing as npt
 from scipy import spatial
 
+# from . import hand_description
+import hand_description
+
 
 def shift_wrist_to_origin(hand: npt.NDArray) -> npt.NDArray:
     if hand.shape != (21, 3):
         raise ValueError("Incorrect landmark shape.")
     return hand - hand[[0]]
+
+
+def scale_hand(hand: npt.NDArray) -> npt.NDArray:
+    hand = hand - hand.mean(axis=0, keepdims=True)
+    scale = (1 / np.max(np.abs(hand))) * 0.999999
+    return hand * scale
 
 
 def compute_rotation_matrix(
@@ -30,6 +39,26 @@ def compute_rotation_matrix(
     rotation, _ = rotation.align_vectors(vectors_misaligned, vectors_aligned)
 
     return rotation.as_matrix()
+
+
+def rotate_hand(
+    hand: npt.NDArray, palm_normal: npt.NDArray, knuckle_line: npt.NDArray
+) -> npt.NDArray:
+    if hand.shape != (21, 3):
+        raise ValueError("Incorrect landmark shape.")
+
+    target_directions = np.stack([palm_normal.flatten(), knuckle_line.flatten()])
+
+    # extract vectors from hand
+    hand_palm_normal = hand_description.compute_palm_direction(hand)
+    hand_knuckle_line = hand_description.compute_knuckle_direction(hand)
+    hand_directions = np.array([hand_palm_normal, hand_knuckle_line])
+
+    rotation_matrix = compute_rotation_matrix(
+        vectors_aligned=target_directions, vectors_misaligned=hand_directions
+    )
+
+    return np.dot(hand, rotation_matrix)
 
 
 if __name__ == "__main__":
