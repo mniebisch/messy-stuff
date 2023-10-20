@@ -144,33 +144,34 @@ value_indices = ["hand" in column for column in frame_data.index]
 
 hand_data = frame_data[value_indices].values
 hand_data = hand_data.reshape((21, 3))
-
+hand_data = hand_data.astype(np.float64)
 hand_data = alignment.scale_hand(hand_data)
+hand_data = alignment.shift_wrist_to_origin(hand_data)
 
-# TODO load actual landmarks
-# TODO describe 'desired' knuckle line
-# TODO describe 'desired' palm normal
-# TODO create rotation matrix
-# TODO compute rotated landmarks
-hand_landmarks2 = np.random.rand(21, 3) * 100  # Replace this with your actual data
-hand_landmarks2 = alignment.scale_hand(hand_landmarks2)
 
+knuckle_line_expected = np.array([-1, 0, 0]).astype(np.float64)
+palm_direction_expected = np.array([0, 0, 1]).astype(np.float64)
+hand_rotated = alignment.rotate_hand(
+    hand=hand_data,
+    palm_normal=palm_direction_expected,
+    knuckle_line=knuckle_line_expected,
+)
 
 scatter_3d = go.Figure()
 add_hand_3d(scatter_3d, hand_data, "red")
-add_hand_3d(scatter_3d, hand_landmarks2, "blue")
+add_hand_3d(scatter_3d, hand_rotated, "blue")
 
 scatter_xy = go.Figure()
 add_hand_2d(scatter_xy, hand_data, x_axis=0, y_axis=1, color="red")
-add_hand_2d(scatter_xy, hand_landmarks2, x_axis=0, y_axis=1, color="blue")
+add_hand_2d(scatter_xy, hand_rotated, x_axis=0, y_axis=1, color="blue")
 
 scatter_yz = go.Figure()
 add_hand_2d(scatter_yz, hand_data, x_axis=2, y_axis=1, color="red")
-add_hand_2d(scatter_yz, hand_landmarks2, x_axis=2, y_axis=1, color="blue")
+add_hand_2d(scatter_yz, hand_rotated, x_axis=2, y_axis=1, color="blue")
 
 scatter_xz = go.Figure()
 add_hand_2d(scatter_xz, hand_data, x_axis=0, y_axis=2, color="red")
-add_hand_2d(scatter_xz, hand_landmarks2, x_axis=0, y_axis=2, color="blue")
+add_hand_2d(scatter_xz, hand_rotated, x_axis=0, y_axis=2, color="blue")
 
 # Create subplots
 fig = make_subplots(
