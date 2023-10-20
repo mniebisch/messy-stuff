@@ -49,9 +49,15 @@ def compute_palm_direction(hand: npt.NDArray) -> tuple[float, float, float]:
     index_knuckle = hand[5]
     pinky_knuckle = hand[17]
 
+    # right hand rule 'a' vector
     wrist_index_direction = index_knuckle - wrist
+    # right hasnd rule 'b' vector
     wrist_pinky_direction = pinky_knuckle - wrist
 
+    # considering right hand rule
+    # and given assumption that right hand was recorded
+    # cross product direction is towards the camera if the inner side of the hand
+    # points towards the camera too
     palm_direction = np.cross(wrist_index_direction, wrist_pinky_direction)
     return tuple(palm_direction)
 
