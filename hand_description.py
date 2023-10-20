@@ -31,13 +31,16 @@ def compute_extend(hand: npt.NDArray) -> tuple[float, float, float]:
 
 
 def compute_knuckle_direction(hand: npt.NDArray) -> tuple[float, float, float]:
+    """
+    Knuckle direction as vector going from pinky knuckle to index knuckle.
+    """
     if hand.shape != (21, 3):
         raise ValueError("Incorrect landmark shape.")
 
     index_knuckle = hand[5]
     pinky_knuckle = hand[17]
 
-    knuckle_direction = pinky_knuckle - index_knuckle
+    knuckle_direction = index_knuckle - pinky_knuckle
     return tuple(knuckle_direction)
 
 
