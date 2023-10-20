@@ -13,6 +13,9 @@ def shift_wrist_to_origin(hand: npt.NDArray) -> npt.NDArray:
 
 
 def scale_hand(hand: npt.NDArray) -> npt.NDArray:
+    """
+    Attention code redundance with pipeline_fingerspelling5.Scale class.
+    """
     hand = hand - hand.mean(axis=0, keepdims=True)
     scale = (1 / np.max(np.abs(hand))) * 0.999999
     return hand * scale
