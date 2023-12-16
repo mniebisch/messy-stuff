@@ -20,6 +20,7 @@ PolygonStats = collections.namedtuple("PolygonStats", "area perimeter")
 Planes = collections.namedtuple("Planes", "xy yz xz")
 
 
+# numpy batchable
 def compute_extend(hand: npt.NDArray) -> tuple[float, float, float]:
     if hand.shape != (21, 3):
         raise ValueError("Incorrect landmark shape.")
@@ -30,6 +31,7 @@ def compute_extend(hand: npt.NDArray) -> tuple[float, float, float]:
     return tuple(extend)
 
 
+# numpy batchable
 def compute_knuckle_direction(hand: npt.NDArray) -> tuple[float, float, float]:
     """
     Knuckle direction as vector going from pinky knuckle to index knuckle.
@@ -44,6 +46,7 @@ def compute_knuckle_direction(hand: npt.NDArray) -> tuple[float, float, float]:
     return tuple(knuckle_direction)
 
 
+# numpy batchable (??? depends on np.cross)
 def compute_palm_direction(hand: npt.NDArray) -> tuple[float, float, float]:
     if hand.shape != (21, 3):
         raise ValueError("Incorrect landmark shape.")
@@ -87,6 +90,7 @@ def compute_distance_adjacency(hand: npt.NDArray, dim: str = "all") -> npt.NDArr
     return distance.cdist(hand[:, dim_indices], hand[dim_indices], metric="euclidean")
 
 
+# numpy batchable
 def compute_hand_mean(hand: npt.NDArray, part: str = "all") -> npt.NDArray:
     if hand.shape != (21, 3):
         raise ValueError("Incorrect landmark shape.")
@@ -103,6 +107,7 @@ def compute_hand_mean(hand: npt.NDArray, part: str = "all") -> npt.NDArray:
     return np.mean(hand[indices], axis=0)
 
 
+# numpy batchable
 def compute_hand_std(hand: npt.NDArray, part: str = "all") -> npt.NDArray:
     if hand.shape != (21, 3):
         raise ValueError("Incorrect landmark shape.")
