@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import tqdm
 from dash import Dash, Input, Output, dcc, html
 from numpy import typing as npt
+from sklearn import metrics
 
 import hand_description
 import pipeline_fingerspelling5
@@ -57,6 +58,17 @@ stats_long = pd.melt(stats, id_vars=id_vars)
 var_columns = set(stats.columns) - set(id_vars)
 var_columns = list(var_columns)
 
+# compute confusion matrix
+confusion_matrix = metrics.confusion_matrix(
+    y_true=stats["letter"], y_pred=stats["preds"], labels=letters
+)
+fig_cf = px.imshow(
+    confusion_matrix,
+    labels=dict(x="Predicted", y="Groundtruth", color="Count"),
+    x=letters,
+    y=letters,
+)
+
 
 def add_letter_trace(
     fig: go.Figure,
@@ -91,22 +103,12 @@ def add_letter_trace(
         )
     )
 
+
 app = Dash(__name__)
 app.layout = html.Div(
     [
         dcc.Tabs(
             [
-                dcc.Tab(
-                    label="scatter",
-                    children=[
-                        dcc.Dropdown(var_columns, var_columns[0], id="x_dim"),
-                        dcc.Dropdown(var_columns, var_columns[1], id="y_dim"),
-                        dcc.Dropdown(
-                            letters, letters[0], id="letter_picks", multi=True
-                        ),
-                        dcc.Graph(id="graph"),
-                    ],
-                ),
                 dcc.Tab(
                     label="overview",
                     children=[
@@ -118,6 +120,23 @@ app.layout = html.Div(
                         html.Button("(r, u, v)", id="ruv_button", n_clicks=0),
                         html.Button("all", id="all_button", n_clicks=0),
                         dcc.Graph(id="graph_overview"),
+                    ],
+                ),
+                dcc.Tab(
+                    label="confusion matrix",
+                    children=[
+                        dcc.Graph(id="confusion_matrix", figure=fig_cf),
+                    ],
+                ),
+                dcc.Tab(
+                    label="scatter",
+                    children=[
+                        dcc.Dropdown(var_columns, var_columns[0], id="x_dim"),
+                        dcc.Dropdown(var_columns, var_columns[1], id="y_dim"),
+                        dcc.Dropdown(
+                            letters, letters[0], id="letter_picks", multi=True
+                        ),
+                        dcc.Graph(id="graph"),
                     ],
                 ),
             ]
