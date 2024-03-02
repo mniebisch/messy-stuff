@@ -23,6 +23,57 @@ def reshape_hands(df: pd.DataFrame) -> npt.NDArray:
     return hand_vals.astype(np.float64)
 
 
+def calc_prediction_metrics(
+    y_true: npt.NDArray, y_pred: npt.NDArray
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    labels = np.sort(np.unique(y_true))
+    recall_label = metrics.recall_score(y_true, y_pred, average=None, labels=labels)
+    precision_label = metrics.precision_score(
+        y_true, y_pred, average=None, labels=labels
+    )
+    f1_label = metrics.f1_score(y_true, y_pred, average=None, labels=labels)
+    recall_micro = metrics.recall_score(y_true, y_pred, average="micro")
+    precision_micro = metrics.precision_score(y_true, y_pred, average="micro")
+    f1_micro = metrics.f1_score(y_true, y_pred, average="micro")
+    recall_macro = metrics.recall_score(y_true, y_pred, average="macro")
+    precision_macro = metrics.precision_score(y_true, y_pred, average="macro")
+    f1_macro = metrics.f1_score(y_true, y_pred, average="macro")
+    accuracy = metrics.accuracy_score(y_true, y_pred)
+
+    metrics_agg = pd.DataFrame(
+        {
+            "metric": [
+                "recall_micro",
+                "recall_macro",
+                "precision_micro",
+                "precision_macro",
+                "f1_micro",
+                "f1_macro",
+                "accuracy",
+            ],
+            "value": [
+                recall_micro,
+                recall_macro,
+                precision_micro,
+                precision_macro,
+                f1_micro,
+                f1_macro,
+                accuracy,
+            ],
+        }
+    )
+    metrics_label = pd.DataFrame(
+        {
+            "recall": recall_label,
+            "precision": precision_label,
+            "f1": f1_label,
+            "label": labels,
+        }
+    )
+    metrics_label = pd.melt(metrics_label, id_vars=["label"])
+    return metrics_agg, metrics_label
+
+
 # load dataeset -> labels and co contained?
 data_path = pathlib.Path(__file__).parent / "data"
 fingerspelling_landmark_csv = data_path / "fingerspelling5_singlehands.csv"
@@ -70,24 +121,29 @@ fig_cf = px.imshow(
     y=letters,
 )
 
+metrics_agg, metrics_label = calc_prediction_metrics(
+    y_true=stats["letter"].values, y_pred=stats["preds"].values
+)
+
+fig_metrics_agg = px.bar(metrics_agg, x="metric", y="value")
+fig_metrics_label = px.bar(metrics_label, x="label", y="value", color="variable", barmode="group")
+
 dist_orders = {
     "letter": [letter for letter in string.ascii_lowercase if letter not in ("j", "z")],
-    "person": sorted(landmark_data["person"].unique().tolist())
+    "person": sorted(landmark_data["person"].unique().tolist()),
 }
 dist_plots = {
     "person_label": px.histogram(
-        landmark_data, x="letter", color="person",
+        landmark_data,
+        x="letter",
+        color="person",
         category_orders=dist_orders,
+        barmode="group"
     ),
-    "person": px.histogram(
-        landmark_data, x="person",
-        category_orders=dist_orders
-    ),
-    "label": px.histogram(
-        landmark_data, x="letter",
-        category_orders=dist_orders
-    ),
+    "person": px.histogram(landmark_data, x="person", category_orders=dist_orders),
+    "label": px.histogram(landmark_data, x="letter", category_orders=dist_orders),
 }
+
 
 def add_letter_trace(
     fig: go.Figure,
@@ -161,14 +217,24 @@ app.layout = html.Div(
                 dcc.Tab(
                     label="label_dist",
                     children=[
-                        dcc.Dropdown(list(dist_plots.keys()), "person_label", id="dist_option"),
+                        dcc.Dropdown(
+                            list(dist_plots.keys()), "person_label", id="dist_option"
+                        ),
                         dcc.Graph(id="dist_graph"),
+                    ],
+                ),
+                dcc.Tab(
+                    label="pred metrics",
+                    children=[
+                        dcc.Graph(id="pred_metrics_agg_graph", figure=fig_metrics_agg),
+                        dcc.Graph(id="pred_metrics_label_graph", figure=fig_metrics_label),
                     ],
                 ),
             ]
         )
     ]
 )
+
 
 @app.callback(
     Output(component_id="dist_graph", component_property="figure"),
