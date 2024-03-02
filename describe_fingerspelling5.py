@@ -126,7 +126,9 @@ metrics_agg, metrics_label = calc_prediction_metrics(
 )
 
 fig_metrics_agg = px.bar(metrics_agg, x="metric", y="value")
-fig_metrics_label = px.bar(metrics_label, x="label", y="value", color="variable", barmode="group")
+fig_metrics_label = px.bar(
+    metrics_label, x="label", y="value", color="variable", barmode="group"
+)
 
 dist_orders = {
     "letter": [letter for letter in string.ascii_lowercase if letter not in ("j", "z")],
@@ -138,7 +140,7 @@ dist_plots = {
         x="letter",
         color="person",
         category_orders=dist_orders,
-        barmode="group"
+        barmode="group",
     ),
     "person": px.histogram(landmark_data, x="person", category_orders=dist_orders),
     "label": px.histogram(landmark_data, x="letter", category_orders=dist_orders),
@@ -227,7 +229,9 @@ app.layout = html.Div(
                     label="pred metrics",
                     children=[
                         dcc.Graph(id="pred_metrics_agg_graph", figure=fig_metrics_agg),
-                        dcc.Graph(id="pred_metrics_label_graph", figure=fig_metrics_label),
+                        dcc.Graph(
+                            id="pred_metrics_label_graph", figure=fig_metrics_label
+                        ),
                     ],
                 ),
             ]
@@ -332,4 +336,4 @@ if __name__ == "__main__":
 # TODO how to achieve visualization for cross validation?
 # for barplots: aggregate and show errorbars for train and valid? (regarding preds not label dist)
 # for confusion matrices: for all or dropdown?
-# 
+#
