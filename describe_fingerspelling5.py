@@ -325,8 +325,11 @@ if __name__ == "__main__":
     app.run(debug=True)
     print("Done")
 
-# TODO add tabs https://dash.plotly.com/dash-core-components/tabs
-# TODO add confusion matrices (tab of its own)
-
 # https://www.evidentlyai.com/classification-metrics/multi-class-metrics
 # https://arxiv.org/pdf/2008.05756.pdf
+
+# TODO how to achieve visualization for train, valid, test split? (I guess straight forward)
+# TODO how to achieve visualization for cross validation?
+# for barplots: aggregate and show errorbars for train and valid? (regarding preds not label dist)
+# for confusion matrices: for all or dropdown?
+# 
