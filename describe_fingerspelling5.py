@@ -1,5 +1,6 @@
 import itertools
 import pathlib
+import string
 
 import numpy as np
 import pandas as pd
@@ -69,6 +70,24 @@ fig_cf = px.imshow(
     y=letters,
 )
 
+dist_orders = {
+    "letter": [letter for letter in string.ascii_lowercase if letter not in ("j", "z")],
+    "person": sorted(landmark_data["person"].unique().tolist())
+}
+dist_plots = {
+    "person_label": px.histogram(
+        landmark_data, x="letter", color="person",
+        category_orders=dist_orders,
+    ),
+    "person": px.histogram(
+        landmark_data, x="person",
+        category_orders=dist_orders
+    ),
+    "label": px.histogram(
+        landmark_data, x="letter",
+        category_orders=dist_orders
+    ),
+}
 
 def add_letter_trace(
     fig: go.Figure,
@@ -139,10 +158,24 @@ app.layout = html.Div(
                         dcc.Graph(id="graph"),
                     ],
                 ),
+                dcc.Tab(
+                    label="label_dist",
+                    children=[
+                        dcc.Dropdown(list(dist_plots.keys()), "person_label", id="dist_option"),
+                        dcc.Graph(id="dist_graph"),
+                    ],
+                ),
             ]
         )
     ]
 )
+
+@app.callback(
+    Output(component_id="dist_graph", component_property="figure"),
+    Input(component_id="dist_option", component_property="value"),
+)
+def update_dist(dist_option: str):
+    return dist_plots[dist_option]
 
 
 @app.callback(
@@ -228,3 +261,6 @@ if __name__ == "__main__":
 
 # TODO add tabs https://dash.plotly.com/dash-core-components/tabs
 # TODO add confusion matrices (tab of its own)
+
+# https://www.evidentlyai.com/classification-metrics/multi-class-metrics
+# https://arxiv.org/pdf/2008.05756.pdf
