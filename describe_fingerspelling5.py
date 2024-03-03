@@ -81,7 +81,7 @@ landmark_data = pd.read_csv(fingerspelling_landmark_csv)
 
 # train/test/valid split?
 
-# are there nans?
+# are there nans? jupp
 landmark_data = landmark_data.loc[~landmark_data.isnull().any(axis=1)]
 landmark_data = landmark_data.reset_index()
 
