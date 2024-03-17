@@ -1,13 +1,14 @@
 import pathlib
 
-import torch
 import pandas as pd
+import torch
+import torch.nn as nn
+import torch.optim as optim
 import torchvision
 from sklearn import model_selection
-from torch_geometric import transforms as pyg_transforms
-import torch.optim as optim
-import torch.nn as nn
 from torch.utils import data as torch_data
+from torch.utils.tensorboard import SummaryWriter
+from torch_geometric import transforms as pyg_transforms
 from tqdm import tqdm
 
 torchvision.disable_beta_transforms_warning()
@@ -58,7 +59,16 @@ def validation_step():
     raise NotImplementedError
 
 
-def train_model(model, optimizer, scheduler, num_epochs, training_loader, criterion, device):
+def train_model(
+        model, 
+        optimizer, 
+        scheduler, 
+        num_epochs, 
+        training_loader, 
+        criterion, 
+        device,
+        writer
+    ):
     model.train()
     optimizer.zero_grad()
     for epoch in range(num_epochs):
@@ -69,6 +79,8 @@ def train_model(model, optimizer, scheduler, num_epochs, training_loader, criter
         for batch_idx, batch in enumerate(batch_iterator):
             loss = training_step(batch, batch_idx, model, criterion, device)
             batch_iterator.set_postfix({"loss": rolling_loss(loss.item())})
+            step = len(train_dataloader) * epoch + batch_idx
+            writer.add_scalar("loss/train", loss, step)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -82,7 +94,8 @@ if __name__ == "__main__":
 
     # Load Data
     data_path = pathlib.Path(__file__).parent.parent / "data"
-    fingerspelling_landmark_csv = data_path / "fingerspelling5_singlehands.csv"
+    # fingerspelling_landmark_csv = data_path / "fingerspelling5_singlehands.csv"
+    fingerspelling_landmark_csv = data_path / "fingerspelling5_dummy_data.csv"
     landmark_data = pd.read_csv(fingerspelling_landmark_csv)
 
     # Create Random Group Split
@@ -128,8 +141,20 @@ if __name__ == "__main__":
     optimizer = configure_optimizers(model=model, lr=lr)
     scheduler = configure_scheduler(optimizer=optimizer, t_max=num_epochs)
 
-    train_model(model=model, optimizer=optimizer, scheduler=scheduler, num_epochs=num_epochs, training_loader=train_dataloader, criterion=criterion, device=device)
+    writer = SummaryWriter()
 
+    train_model(
+        model=model, 
+        optimizer=optimizer, 
+        scheduler=scheduler, 
+        num_epochs=num_epochs, 
+        training_loader=train_dataloader, 
+        criterion=criterion, 
+        device=device,
+        writer=writer,
+    )
+
+    writer.close()
     print("Done")
 
 
