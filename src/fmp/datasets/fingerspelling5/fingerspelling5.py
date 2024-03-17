@@ -42,7 +42,7 @@ class Fingerspelling5Landmark(Dataset):
         self._landmark_data = landmark_data
 
         # landmark data 'properties'
-        self.num_features = utils.MEDIAPIPE_HAND_LANDMARKS["num_nodes"]
+        self.num_features = utils.MEDIAPIPE_HAND_LANDMARKS["num_nodes"] * 3
         self._landmark_cols = utils.generate_hand_landmark_columns()
         self._person_col = "person"
         self._letter_col = "letter"
