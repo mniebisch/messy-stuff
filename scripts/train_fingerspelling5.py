@@ -1,3 +1,4 @@
+from datetime import datetime
 import pathlib
 
 import pandas as pd
@@ -14,6 +15,12 @@ from tqdm import tqdm
 torchvision.disable_beta_transforms_warning()
 
 from fmp import datasets, models
+
+
+def current_timestamp_string():
+    now = datetime.now()
+    timestamp_string = now.strftime("%Y-%m-%d_%H-%M-%S-%f")[:-3]  # Extract milliseconds and remove trailing zeros
+    return timestamp_string
 
 
 class RollingLoss:
@@ -92,6 +99,10 @@ if __name__ == "__main__":
     num_epochs = 10
     batch_size = 128
 
+    log_path = pathlib.Path(__file__).parent.parent / "runs"
+
+    run_id = current_timestamp_string()
+
     # Load Data
     data_path = pathlib.Path(__file__).parent.parent / "data"
     # fingerspelling_landmark_csv = data_path / "fingerspelling5_singlehands.csv"
@@ -141,7 +152,7 @@ if __name__ == "__main__":
     optimizer = configure_optimizers(model=model, lr=lr)
     scheduler = configure_scheduler(optimizer=optimizer, t_max=num_epochs)
 
-    writer = SummaryWriter()
+    writer = SummaryWriter(log_path / run_id)
 
     train_model(
         model=model, 
