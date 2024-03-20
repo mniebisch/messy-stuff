@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Dict, Tuple
 import pathlib
 
 import yaml
@@ -45,15 +46,21 @@ class RollingLoss:
 
 
 
-def configure_optimizers(model, lr: float):
+def configure_optimizers(model, lr: float) -> optim.Optimizer:
     return optim.AdamW(model.parameters(), lr=lr)
 
 
-def configure_scheduler(optimizer, t_max):
+def configure_scheduler(optimizer, t_max) -> optim.lr_scheduler.LRScheduler:
     return optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
 
 
-def training_step(batch, batch_idx, model, criterion, device):
+def training_step(
+        batch: Tuple[torch.Tensor, torch.Tensor], 
+        batch_idx: int, 
+        model: nn.Module, 
+        criterion, 
+        device: torch.device,
+    ):
     # hmpfs, following line is coupled to dataset! -> wayne
     landmarks, label = batch
     landmarks = landmarks.to(device)
@@ -63,19 +70,30 @@ def training_step(batch, batch_idx, model, criterion, device):
     return loss
 
 
-def validation_step():
-    raise NotImplementedError
+def validation_step(
+        batch: Tuple[torch.Tensor, torch.Tensor], 
+        model: nn.Module, 
+        device: torch.device,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    landmarks, labels = batch
+    landmarks = landmarks.to(device)
+    predictions: torch.Tensor = model(landmarks)
+    predictions = predictions.detach().cpu()
+
+    return predictions, labels
 
 
 def train_model(
-        model, 
-        optimizer, 
-        scheduler, 
-        num_epochs, 
-        training_loader, 
-        criterion, 
-        device,
-        writer
+        model: nn.Module, 
+        optimizer: optim.Optimizer, 
+        scheduler: optim.lr_scheduler.LRScheduler, 
+        num_epochs: int, 
+        training_loader: torch_data.DataLoader, 
+        criterion: nn.Module, 
+        device: torch.device,
+        writer: SummaryWriter,
+        validation_dataloaders: Dict[str, torch_data.DataLoader],
+        validation_step_size: int,
     ):
     model.train()
     optimizer.zero_grad()
@@ -85,14 +103,38 @@ def train_model(
         )
         rolling_loss = RollingLoss()
         for batch_idx, batch in enumerate(batch_iterator):
+            step = len(train_dataloader) * epoch + batch_idx
             loss = training_step(batch, batch_idx, model, criterion, device)
             batch_iterator.set_postfix({"loss": rolling_loss(loss.item())})
-            step = len(train_dataloader) * epoch + batch_idx
             writer.add_scalar("loss/train", loss, step)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
         scheduler.step()
+
+        if epoch % validation_step_size == 0 and epoch != 1:
+            for split, dataloader in validation_dataloaders.items():
+                acc = validate_model(model, dataloader, device)
+                writer.add_scalar(f"acc/{split}", acc, step)
+
+
+def validate_model(
+        model: nn.Module,
+        data_loader: torch_data.DataLoader,
+        device: torch.device,
+) -> float:
+    total = 0
+    correct = 0
+    model.eval()
+    with torch.no_grad():
+        for batch in tqdm(data_loader):
+            predictions, labels = validation_step(batch, model, device)
+            predictions = torch.argmax(predictions, dim=1)
+            labels = torch.argmax(labels, dim=1)
+            total += labels.shape[0]
+            correct += (predictions == labels).sum().item()
+    model.train()
+    return correct / total
 
 
 if __name__ == "__main__":
@@ -100,11 +142,13 @@ if __name__ == "__main__":
     with open(config_filepath, "r") as config_file:
         config = yaml.safe_load(config_file)
     
+    validation_step_size = config["validation_step_size"]
+
     lr = config["lr"]
     num_epochs = config["num_epochs"]
     batch_size = config["batch_size"]
-    
-    log_path = config["paths"]["tensorboard_logs"]
+
+    log_path = pathlib.Path(config["paths"]["tensorboard_logs"])
 
     run_id = current_timestamp_string()
 
@@ -142,6 +186,38 @@ if __name__ == "__main__":
         drop_last=True
     )
 
+    # Setup Validation
+    # # Validation Transforms
+    valid_transforms = pyg_transforms.Compose(
+        [
+            pyg_transforms.NormalizeScale(),
+        ]
+    )
+    # # Training Data Validation
+    train_valid_dataset = datasets.fingerspelling5.Fingerspelling5Landmark(
+        train_data, transforms=valid_transforms, filter_nans=True
+    )
+    train_valid_dataloader = torch_data.DataLoader(
+        train_valid_dataset, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        drop_last=False
+    )
+    # # Validation Data Validation
+    valid_dataset = datasets.fingerspelling5.Fingerspelling5Landmark(
+        valid_data, transforms=valid_transforms, filter_nans=True
+    )
+    valid_dataloader = torch_data.DataLoader(
+        valid_dataset, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        drop_last=False
+    )
+    validation_dataloaders = {
+        "train": train_valid_dataloader,
+        "valid": valid_dataloader,
+    }
+
     # Setup Model
     model = models.MLPClassifier(
         input_dim=train_dataset.num_features,
@@ -168,6 +244,8 @@ if __name__ == "__main__":
         criterion=criterion, 
         device=device,
         writer=writer,
+        validation_dataloaders=validation_dataloaders,
+        validation_step_size=validation_step_size,
     )
 
     writer.close()
