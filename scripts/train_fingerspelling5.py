@@ -1,6 +1,7 @@
 from datetime import datetime
 import pathlib
 
+import yaml
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -95,11 +96,15 @@ def train_model(
 
 
 if __name__ == "__main__":
-    lr = 0.001
-    num_epochs = 10
-    batch_size = 128
-
-    log_path = pathlib.Path(__file__).parent.parent / "runs"
+    config_filepath = pathlib.Path(__file__).parent.parent / "configs" / "example.yaml"
+    with open(config_filepath, "r") as config_file:
+        config = yaml.safe_load(config_file)
+    
+    lr = config["lr"]
+    num_epochs = config["num_epochs"]
+    batch_size = config["batch_size"]
+    
+    log_path = config["paths"]["tensorboard_logs"]
 
     run_id = current_timestamp_string()
 
@@ -169,8 +174,6 @@ if __name__ == "__main__":
     print("Done")
 
 
-# TODO create run ID
-# TODO read config
 # TODO save run information (paths, id, config)
 # TODO save checkpoint
 # TODO track loss and some metric
