@@ -70,6 +70,7 @@ class PyGDataUnwrapper(object):
     def __call__(self, graph: pyg_data.Data) -> torch.Tensor:
         return graph.pos
 
+
 class NDArrayToTensor(object):
     def __call__(self, data: npt.NDArray) -> torch.Tensor:
         return torch.from_numpy(data)

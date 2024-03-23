@@ -1,13 +1,13 @@
+import pathlib
 from datetime import datetime
 from typing import Dict, Tuple
-import pathlib
 
-import yaml
 import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
+import yaml
 from sklearn import model_selection
 from torch.utils import data as torch_data
 from torch.utils.tensorboard import SummaryWriter
@@ -21,7 +21,9 @@ from fmp import datasets, models
 
 def current_timestamp_string():
     now = datetime.now()
-    timestamp_string = now.strftime("%Y-%m-%d_%H-%M-%S-%f")[:-3]  # Extract milliseconds and remove trailing zeros
+    timestamp_string = now.strftime("%Y-%m-%d_%H-%M-%S-%f")[
+        :-3
+    ]  # Extract milliseconds and remove trailing zeros
     return timestamp_string
 
 
@@ -45,7 +47,6 @@ class RollingLoss:
         return str(self.rolling_loss)
 
 
-
 def configure_optimizers(model, lr: float) -> optim.Optimizer:
     return optim.AdamW(model.parameters(), lr=lr)
 
@@ -55,12 +56,12 @@ def configure_scheduler(optimizer, t_max) -> optim.lr_scheduler.LRScheduler:
 
 
 def training_step(
-        batch: Tuple[torch.Tensor, torch.Tensor], 
-        batch_idx: int, 
-        model: nn.Module, 
-        criterion, 
-        device: torch.device,
-    ):
+    batch: Tuple[torch.Tensor, torch.Tensor],
+    batch_idx: int,
+    model: nn.Module,
+    criterion,
+    device: torch.device,
+):
     # hmpfs, following line is coupled to dataset! -> wayne
     landmarks, label = batch
     landmarks = landmarks.to(device)
@@ -71,10 +72,10 @@ def training_step(
 
 
 def validation_step(
-        batch: Tuple[torch.Tensor, torch.Tensor], 
-        model: nn.Module, 
-        device: torch.device,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    batch: Tuple[torch.Tensor, torch.Tensor],
+    model: nn.Module,
+    device: torch.device,
+) -> Tuple[torch.Tensor, torch.Tensor]:
     landmarks, labels = batch
     landmarks = landmarks.to(device)
     predictions: torch.Tensor = model(landmarks)
@@ -84,17 +85,17 @@ def validation_step(
 
 
 def train_model(
-        model: nn.Module, 
-        optimizer: optim.Optimizer, 
-        scheduler: optim.lr_scheduler.LRScheduler, 
-        num_epochs: int, 
-        training_loader: torch_data.DataLoader, 
-        criterion: nn.Module, 
-        device: torch.device,
-        writer: SummaryWriter,
-        validation_dataloaders: Dict[str, torch_data.DataLoader],
-        validation_step_size: int,
-    ):
+    model: nn.Module,
+    optimizer: optim.Optimizer,
+    scheduler: optim.lr_scheduler.LRScheduler,
+    num_epochs: int,
+    training_loader: torch_data.DataLoader,
+    criterion: nn.Module,
+    device: torch.device,
+    writer: SummaryWriter,
+    validation_dataloaders: Dict[str, torch_data.DataLoader],
+    validation_step_size: int,
+):
     model.train()
     optimizer.zero_grad()
     for epoch in range(num_epochs):
@@ -119,9 +120,9 @@ def train_model(
 
 
 def validate_model(
-        model: nn.Module,
-        data_loader: torch_data.DataLoader,
-        device: torch.device,
+    model: nn.Module,
+    data_loader: torch_data.DataLoader,
+    device: torch.device,
 ) -> float:
     total = 0
     correct = 0
@@ -141,7 +142,7 @@ if __name__ == "__main__":
     config_filepath = pathlib.Path(__file__).parent.parent / "configs" / "example.yaml"
     with open(config_filepath, "r") as config_file:
         config = yaml.safe_load(config_file)
-    
+
     validation_step_size = config["validation_step_size"]
 
     lr = config["lr"]
@@ -180,10 +181,7 @@ if __name__ == "__main__":
         train_data, transforms=train_transforms, filter_nans=True
     )
     train_dataloader = torch_data.DataLoader(
-        train_dataset, 
-        batch_size=batch_size, 
-        shuffle=True, 
-        drop_last=True
+        train_dataset, batch_size=batch_size, shuffle=True, drop_last=True
     )
 
     # Setup Validation
@@ -198,20 +196,14 @@ if __name__ == "__main__":
         train_data, transforms=valid_transforms, filter_nans=True
     )
     train_valid_dataloader = torch_data.DataLoader(
-        train_valid_dataset, 
-        batch_size=batch_size, 
-        shuffle=False, 
-        drop_last=False
+        train_valid_dataset, batch_size=batch_size, shuffle=False, drop_last=False
     )
     # # Validation Data Validation
     valid_dataset = datasets.fingerspelling5.Fingerspelling5Landmark(
         valid_data, transforms=valid_transforms, filter_nans=True
     )
     valid_dataloader = torch_data.DataLoader(
-        valid_dataset, 
-        batch_size=batch_size, 
-        shuffle=False, 
-        drop_last=False
+        valid_dataset, batch_size=batch_size, shuffle=False, drop_last=False
     )
     validation_dataloaders = {
         "train": train_valid_dataloader,
@@ -236,12 +228,12 @@ if __name__ == "__main__":
     writer = SummaryWriter(log_path / run_id)
 
     train_model(
-        model=model, 
-        optimizer=optimizer, 
-        scheduler=scheduler, 
-        num_epochs=num_epochs, 
-        training_loader=train_dataloader, 
-        criterion=criterion, 
+        model=model,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        num_epochs=num_epochs,
+        training_loader=train_dataloader,
+        criterion=criterion,
         device=device,
         writer=writer,
         validation_dataloaders=validation_dataloaders,

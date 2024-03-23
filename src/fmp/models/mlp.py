@@ -2,6 +2,7 @@ import torch.nn as nn
 
 __all__ = ["MLPClassifier"]
 
+
 class MLPClassifier(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(MLPClassifier, self).__init__()
