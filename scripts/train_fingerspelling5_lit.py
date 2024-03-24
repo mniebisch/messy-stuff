@@ -14,7 +14,7 @@ from fmp import datasets, models
 
 
 if __name__ == "__main__":
-    lr = "blub"
+    lr = 0.001
     num_epochs = 20
     batch_size = 128
 
@@ -75,6 +75,8 @@ if __name__ == "__main__":
         input_dim=train_dataset.num_features,
         hidden_dim=10,
         output_dim=train_dataset.num_letters,
+        learning_rate=lr,
+        scheduler_T_max=num_epochs,
     )
 
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
