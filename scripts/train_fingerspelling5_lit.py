@@ -5,6 +5,7 @@ import lightning as L
 import pandas as pd
 from torch_geometric import transforms as pyg_transforms
 from sklearn import model_selection
+from lightning.pytorch.callbacks import LearningRateMonitor
 from torch.utils import data as torch_data
 
 torchvision.disable_beta_transforms_warning()
@@ -76,10 +77,13 @@ if __name__ == "__main__":
         output_dim=train_dataset.num_letters,
     )
 
+    lr_monitor = LearningRateMonitor(logging_interval="epoch")
+
     trainer = L.Trainer(
         max_epochs=num_epochs,
         log_every_n_steps=1,
         check_val_every_n_epoch=3,
+        callbacks=[lr_monitor],
     )
     trainer.fit(
         model=model,
