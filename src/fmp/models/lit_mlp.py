@@ -39,6 +39,22 @@ class LitMLP(L.LightningModule):
         self.log("loss", loss)
         return loss
 
+    def validation_step(
+        self,
+        batch: Tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ):
+        landmarks, labels = batch
+        predictions = self(landmarks)
+        predictions = torch.argmax(predictions, dim=1)
+        labels = torch.argmax(labels, dim=1)
+        total = labels.shape[0]
+        correct = (predictions == labels).sum()
+        acc = correct / total
+        split = self.trainer.val_dataloaders[dataloader_idx].dataset.split
+        self.log(f"acc/{split}", acc, add_dataloader_idx=False)
+
     def configure_optimizers(self) -> optim.Optimizer:
         # TODO how to configure learning rate?
         return optim.AdamW(self.parameters(), lr=0.001)

@@ -1,5 +1,5 @@
 import string
-from typing import Tuple
+from typing import Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,9 @@ class Fingerspelling5Landmark(Dataset):
         hand_landmark_data: pd.DataFrame,
         transforms=None,
         filter_nans: bool = False,
+        split: Optional[str] = None,
     ):
+        self.split = split
         # transforms: expected to be PyTorch Geometric transforms
 
         # hand_landmark_data are is a dataframe where we already applied
