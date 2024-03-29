@@ -1,6 +1,0 @@
-Metadata-Version: 2.1
-Name: fmp
-Version: 0.0.0
-Requires-Python: >=3.9
-Description-Content-Type: text/markdown
-Requires-Dist: torch
