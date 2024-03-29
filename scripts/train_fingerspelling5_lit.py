@@ -5,6 +5,7 @@ import lightning as L
 import pandas as pd
 from torch_geometric import transforms as pyg_transforms
 from sklearn import model_selection
+from lightning.pytorch.callbacks import LearningRateMonitor
 from torch.utils import data as torch_data
 
 torchvision.disable_beta_transforms_warning()
@@ -13,7 +14,7 @@ from fmp import datasets, models
 
 
 if __name__ == "__main__":
-    lr = "blub"
+    lr = 0.001
     num_epochs = 20
     batch_size = 128
 
@@ -48,11 +49,46 @@ if __name__ == "__main__":
         train_dataset, batch_size=batch_size, shuffle=True, drop_last=True
     )
 
+    # Setup Validation
+    # # Validation Transforms
+    valid_transforms = pyg_transforms.Compose(
+        [
+            pyg_transforms.NormalizeScale(),
+        ]
+    )
+    # # Training Data Validation
+    train_valid_dataset = datasets.fingerspelling5.Fingerspelling5Landmark(
+        train_data, transforms=valid_transforms, filter_nans=True, split="train"
+    )
+    train_valid_dataloader = torch_data.DataLoader(
+        train_valid_dataset, batch_size=batch_size, shuffle=False, drop_last=False
+    )
+    # # Validation Data Validation
+    valid_dataset = datasets.fingerspelling5.Fingerspelling5Landmark(
+        valid_data, transforms=valid_transforms, filter_nans=True, split="val"
+    )
+    valid_dataloader = torch_data.DataLoader(
+        valid_dataset, batch_size=batch_size, shuffle=False, drop_last=False
+    )
+
     model = models.LitMLP(
         input_dim=train_dataset.num_features,
         hidden_dim=10,
         output_dim=train_dataset.num_letters,
+        learning_rate=lr,
+        scheduler_T_max=num_epochs,
     )
 
-    trainer = L.Trainer(max_epochs=num_epochs, log_every_n_steps=1)
-    trainer.fit(model=model, train_dataloaders=train_dataloader)
+    lr_monitor = LearningRateMonitor(logging_interval="epoch")
+
+    trainer = L.Trainer(
+        max_epochs=num_epochs,
+        log_every_n_steps=1,
+        check_val_every_n_epoch=3,
+        callbacks=[lr_monitor],
+    )
+    trainer.fit(
+        model=model,
+        train_dataloaders=train_dataloader,
+        val_dataloaders=[valid_dataloader, train_valid_dataloader],
+    )
