@@ -7,16 +7,23 @@ from sklearn import model_selection
 from torch_geometric import transforms as pyg_transforms
 from torch.utils import data as torch_data
 
-from .fingerspelling5 import Fingerspelling5Landmark
+from .fingerspelling5 import Fingerspelling5Landmark, FINGERSPELLING5
+from . import utils
 
 
-__all__ = ["Fingerspelling5LandmakrDataModule"]
+__all__ = ["Fingerspelling5LandmarkDataModule"]
 
 
-class Fingerspelling5LandmakrDataModule(L.LightningDataModule):
+class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
     def __init__(self, fingerspelling5_csv: pathlib.Path, batch_size: int) -> None:
         super().__init__()
         self.save_hyperparameters()
+        # temporary solution
+        # # mediapipe propterties
+        self.num_features = utils.MEDIAPIPE_HAND_LANDMARKS["num_nodes"] * 3
+        # # fingerspelling5 properties
+        self.letters = FINGERSPELLING5["letters"]
+        self.num_letters = len(self.letters)
 
     def setup(self, stage: str):
         if stage == "fit":
@@ -47,10 +54,16 @@ class Fingerspelling5LandmakrDataModule(L.LightningDataModule):
                 train_data, transforms=train_transforms, filter_nans=True
             )
             self.valid_train_split = Fingerspelling5Landmark(
-                train_data, transforms=valid_transforms, filter_nans=True
+                train_data, 
+                transforms=valid_transforms, 
+                filter_nans=True,
+                split="train",
             )
             self.valid_valid_split = Fingerspelling5Landmark(
-                valid_data, transforms=valid_transforms, filter_nans=True
+                valid_data, 
+                transforms=valid_transforms, 
+                filter_nans=True,
+                split="valid",
             )
 
         elif stage == "test":
