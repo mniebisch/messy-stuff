@@ -13,7 +13,10 @@ __all__ = ["LitMLP"]
 # TODO rename class to LandmarkClassifier or LandmarkFrameBasesClassifier
 class LitMLP(L.LightningModule):
     def __init__(
-        self, input_dim, hidden_dim, output_dim, learning_rate, scheduler_T_max
+        self, 
+        input_dim: int, 
+        hidden_dim: int, 
+        output_dim: int,
     ):
         super().__init__()
 
@@ -59,12 +62,3 @@ class LitMLP(L.LightningModule):
         acc = correct / total
         split = self.trainer.val_dataloaders[dataloader_idx].dataset.split
         self.log(f"acc/{split}", acc, add_dataloader_idx=False)
-
-    def configure_optimizers(
-        self,
-    ) -> Tuple[List[optim.Optimizer], List[optim.lr_scheduler.LRScheduler]]:
-        optimizer = optim.AdamW(self.parameters(), lr=self.hparams.learning_rate)
-        lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=self.hparams.scheduler_T_max
-        )
-        return [optimizer], [lr_scheduler]
