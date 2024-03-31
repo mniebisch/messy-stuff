@@ -1,4 +1,3 @@
-import pathlib
 from typing import List
 
 import pandas as pd
@@ -14,7 +13,7 @@ __all__ = ["Fingerspelling5LandmarkDataModule"]
 
 
 class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
-    def __init__(self, fingerspelling5_csv: pathlib.Path, batch_size: int) -> None:
+    def __init__(self, fingerspelling5_csv: str, batch_size: int) -> None:
         super().__init__()
         self.save_hyperparameters()
         
