@@ -1,10 +1,10 @@
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 import lightning as L
 from sklearn import model_selection
-from torch_geometric import transforms as pyg_transforms
 from torch.utils import data as torch_data
+from torch_geometric.transforms import BaseTransform
 
 from .fingerspelling5 import Fingerspelling5Landmark
 
@@ -13,10 +13,16 @@ __all__ = ["Fingerspelling5LandmarkDataModule"]
 
 
 class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
-    def __init__(self, fingerspelling5_csv: str, batch_size: int) -> None:
+    def __init__(
+        self,
+        fingerspelling5_csv: str,
+        batch_size: int,
+        train_transforms: Optional[BaseTransform] = None,
+        valid_transforms: Optional[BaseTransform] = None,
+    ) -> None:
         super().__init__()
         self.save_hyperparameters()
-        
+
     def setup(self, stage: str):
         if stage == "fit":
             landmark_data = pd.read_csv(self.hparams.fingerspelling5_csv)
@@ -26,34 +32,18 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
             train_data = landmark_data.loc[train_index]
             valid_data = landmark_data.loc[val_index]
 
-            train_transforms = pyg_transforms.Compose(
-                [
-                    pyg_transforms.NormalizeScale(),  # rethink order of transforms?
-                    pyg_transforms.RandomFlip(axis=0),
-                    pyg_transforms.RandomJitter(0.05),
-                    pyg_transforms.RandomRotate(degrees=20, axis=0),
-                    pyg_transforms.RandomRotate(degrees=20, axis=1),
-                    pyg_transforms.RandomRotate(degrees=20, axis=2),
-                ]
-            )
-            valid_transforms = pyg_transforms.Compose(
-                [
-                    pyg_transforms.NormalizeScale(),
-                ]
-            )
-
             self.train_data = Fingerspelling5Landmark(
-                train_data, transforms=train_transforms, filter_nans=True
+                train_data, transforms=self.hparams.train_transforms, filter_nans=True
             )
             self.valid_train_split = Fingerspelling5Landmark(
-                train_data, 
-                transforms=valid_transforms, 
+                train_data,
+                transforms=self.hparams.valid_transforms,
                 filter_nans=True,
                 split="train",
             )
             self.valid_valid_split = Fingerspelling5Landmark(
-                valid_data, 
-                transforms=valid_transforms, 
+                valid_data,
+                transforms=self.hparams.valid_transforms,
                 filter_nans=True,
                 split="valid",
             )
