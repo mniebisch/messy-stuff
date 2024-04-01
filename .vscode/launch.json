@@ -6,11 +6,24 @@
     "configurations": [
         {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false
-        }
+        },
+        {
+            "name": "Train CLI",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
+            "args": [
+                "fit",
+                "--config",
+                "${workspaceFolder}/configs/train_fingerspelling5.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
     ]
 }

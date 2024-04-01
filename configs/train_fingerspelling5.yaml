@@ -10,13 +10,13 @@ trainer:
   logger:
     class_path: lightning.pytorch.loggers.TensorBoardLogger
     init_args:
-      save_dir: /home/micha/projects/messy-stuff/
+      save_dir: .
 model:
   input_dim: 63
   hidden_dim: 10
   output_dim: 24
 data:
-  fingerspelling5_csv: /home/micha/projects/messy-stuff/data/fingerspelling5_dummy_data.csv
+  fingerspelling5_csv: ./data/fingerspelling5_dummy_data.csv
   batch_size: 128
 optimizer:
   class_path: torch.optim.AdamW
