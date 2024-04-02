@@ -19,6 +19,7 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         batch_size: int,
         train_transforms: Optional[BaseTransform] = None,
         valid_transforms: Optional[BaseTransform] = None,
+        predict_transforms: Optional[BaseTransform] = None,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -51,7 +52,12 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         elif stage == "test":
             pass
         elif stage == "predict":
-            pass
+            landmark_data = pd.read_csv(self.hparams.fingerspelling5_csv)
+            self.predict_data = Fingerspelling5Landmark(
+                landmark_data,
+                transforms=self.hparams.predict_transforms,
+                filter_nans=True,
+            )
         else:
             pass
 
@@ -85,4 +91,9 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         raise NotImplementedError
 
     def predict_dataloader(self):
-        raise NotImplementedError
+        return torch_data.DataLoader(
+            self.predict_data,
+            batch_size=self.hparams.batch_size,
+            shuffle=False,
+            drop_last=False,
+        )

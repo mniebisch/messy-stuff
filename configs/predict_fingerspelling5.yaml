@@ -1,0 +1,16 @@
+# lightning.pytorch==2.2.1
+trainer:
+  callbacks:
+    - class_path: fmp.lit_tools.callbacks.Fingerspelling5PredictionWriter
+      init_args:
+        write_interval: epoch
+        output_dir: ./predictions
+data:
+  fingerspelling5_csv: ./data/fingerspelling5_dummy_data.csv
+  batch_size: 128
+  predict_transforms:
+    class_path: torch_geometric.transforms.Compose
+    init_args:
+      transforms:
+        - class_path: torch_geometric.transforms.NormalizeScale
+return_predictions: False

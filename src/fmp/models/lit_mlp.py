@@ -13,9 +13,9 @@ __all__ = ["LitMLP"]
 # TODO rename class to LandmarkClassifier or LandmarkFrameBasesClassifier
 class LitMLP(L.LightningModule):
     def __init__(
-        self, 
-        input_dim: int, 
-        hidden_dim: int, 
+        self,
+        input_dim: int,
+        hidden_dim: int,
         output_dim: int,
     ):
         super().__init__()
@@ -62,3 +62,13 @@ class LitMLP(L.LightningModule):
         acc = correct / total
         split = self.trainer.val_dataloaders[dataloader_idx].dataset.split
         self.log(f"acc/{split}", acc, add_dataloader_idx=False)
+
+    def predict_step(
+        self,
+        batch: Tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ):
+        landmark_data, _ = batch
+        predictions = self(landmark_data)
+        return torch.argmax(predictions, dim=1)
