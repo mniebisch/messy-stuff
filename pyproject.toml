@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "fmp"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["torch"]
+dependencies = ["torch", "tensorboard"]
 dynamic = ["version"]
 
-# [project.optional-dependencies]
-# dev = ["black", "mypy"]
-# test = ["pytest"]
+[project.optional-dependencies]
+dev = ["black", "mypy"]
+test = ["pytest"]
 
 # [tool.mypy]
 # disallow_untyped_defs = true
@@ -24,5 +24,5 @@ dynamic = ["version"]
 # files = "src"
 # allow_redefinition = true
 
-# [tool.pytest.ini_options]
-# testpaths = ["tests"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
