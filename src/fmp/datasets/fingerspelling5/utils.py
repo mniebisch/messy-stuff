@@ -58,8 +58,8 @@ mediapipe_hand_landmarks = MediaPipeHandLandmarks(
 # MediaPipe property!
 # Checkout pragmatic programmer
 def generate_hand_landmark_columns() -> List[str]:
-    num_nodes = MEDIAPIPE_HAND_LANDMARKS["num_nodes"]
-    spatial_coords = MEDIAPIPE_HAND_LANDMARKS["spatial_coords"]
+    num_nodes = mediapipe_hand_landmarks.num_nodes
+    spatial_coords = mediapipe_hand_landmarks.spatial_coords
 
     return [
         f"{spatial_coord}_hand_{node_ind}"
