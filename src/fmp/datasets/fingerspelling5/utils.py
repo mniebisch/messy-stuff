@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any, List, Union
 
 import numpy as np
@@ -13,6 +14,7 @@ __all__ = [
     "PyGDataWrapper",
     "PyGDataUnwrapper",
     "NDArrayToTensor",
+    "mediapipe_hand_landmarks",
 ]
 
 # Use dataclass instead?
@@ -20,6 +22,37 @@ MEDIAPIPE_HAND_LANDMARKS = {
     "num_nodes": 21,
     "spatial_coords": ("x", "y", "z"),
 }
+
+
+@dataclass(frozen=True)
+class HandParts:
+    all: list[int]
+    thumb: list[int]
+    index_finger: list[int]
+    middle_finger: list[int]
+    ring_finger: list[int]
+    pinky: list[int]
+    palm: list[int]
+
+
+@dataclass(frozen=True)
+class MediaPipeHandLandmarks:
+    parts: HandParts
+    num_nodes: int = 21
+    spatial_coords: tuple[str, str, str] = ("x", "y", "z")
+
+
+mediapipe_hand_landmarks = MediaPipeHandLandmarks(
+    parts=HandParts(
+        all=list(range(21)),
+        thumb=[1, 2, 3, 4],
+        index_finger=[5, 6, 7, 8],
+        middle_finger=[9, 10, 11, 12],
+        ring_finger=[13, 14, 15, 16],
+        pinky=[17, 18, 19, 20],
+        palm=[0, 5, 9, 13, 17],
+    )
+)
 
 
 # MediaPipe property!
