@@ -35,3 +35,35 @@ def test_shape_check():
     bad_hand = np.zeros((4, 3))
     with pytest.raises(ValueError, match="Incorrect hand landmark shape."):
         metrics.compute_hand_std(bad_hand)
+
+
+def test_compute_hand_plane_area():
+    hand = np.zeros((21, 3))
+    square_points = np.array(
+        [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [1, 0],
+        ]
+    )
+    hand[:4, [0, 1]] = square_points
+    expected = 1.0
+    output = metrics.compute_hand_plane_area(hand, ("x", "y"))
+    assert output == pytest.approx(expected)
+
+
+def test_compute_hand_plane_perimeter():
+    hand = np.zeros((21, 3))
+    square_points = np.array(
+        [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [1, 0],
+        ]
+    )
+    hand[:4, [0, 1]] = square_points
+    expected = 4.0
+    output = metrics.compute_hand_plane_perimeter(hand, ("x", "y"))
+    assert output == pytest.approx(expected)
