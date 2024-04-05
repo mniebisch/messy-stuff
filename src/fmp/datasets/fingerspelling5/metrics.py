@@ -1,3 +1,6 @@
+import inspect
+from functools import wraps
+
 import numpy as np
 from numpy import typing as npt
 from scipy import spatial
@@ -14,7 +17,17 @@ __all__ = [
 ]
 
 
+def get_default_args(func):
+    signature = inspect.signature(func)
+    return {
+        k: v.default
+        for k, v in signature.parameters.items()
+        if v.default is not inspect.Parameter.empty
+    }
+
+
 def check_hand_landmark_shape(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
         hand = kwargs["hand"] if len(args) < 1 else args[0]
         num_nodes = utils.mediapipe_hand_landmarks.num_nodes
@@ -27,10 +40,14 @@ def check_hand_landmark_shape(func):
 
 
 def location_wrapper(func):
-    def wrap_values(*args, **kwargs):
-        part = kwargs["part"] if len(args) < 2 else args[1]
+    @wraps(func)
+    def wrap_values(*args, **kwds):
+        kwargs = get_default_args(func)
+        kwargs.update(kwds)
+        part = kwargs.get("part")
+        part = args[1] if part is None else part
         metric_type = func.__name__.split("_")[-1]
-        values = func(*args, **kwargs)
+        values = func(*args, **kwds)
         return {
             f"{part}_{dim}_{metric_type}": val
             for val, dim in zip(values, utils.mediapipe_hand_landmarks.spatial_coords)
@@ -40,7 +57,20 @@ def location_wrapper(func):
 
 
 def space_wrapper(func):
-    raise NotImplementedError
+    def wrap_values(*args, **kwds):
+        kwargs = get_default_args(func)
+        kwargs.update(kwds)
+        part = kwargs.get("part")
+        part = args[2] if part is None else part
+        metric_type = func.__name__.split("_")[-1]
+        plane = kwargs.get("plane")
+        plane = args[1] if plane is None else plane
+        plane = "".join(plane)
+
+        value = func(*args, **kwargs)
+        return {f"{part}_{plane}_{metric_type}": value}
+
+    return wrap_values
 
 
 @check_hand_landmark_shape
