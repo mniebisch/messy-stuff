@@ -16,6 +16,7 @@ __all__ = [
     "compute_hand_std",
     "compute_hand_plane_area",
     "compute_hand_plane_perimeter",
+    "compute_palm_direction",
     "compute_palm_angle",
     "distance_wrapper",
     "location_wrapper",
@@ -217,16 +218,25 @@ def compute_distances_std(hand: npt.NDArray, axis: str, part: str = "all") -> fl
 @check_hand_landmark_shape
 def compute_palm_angle(hand: npt.NDArray, plane: tuple[str, str]) -> float:
     palm_direction = compute_palm_direction(hand)
+    return _compute_angle(palm_direction, plane)
 
+
+def _compute_angle(direction: npt.NDArray, plane: tuple[str, str]) -> float:
     plane_ind = (
         utils.mediapipe_hand_landmarks.spatial_coords.index(plane[0]),
         utils.mediapipe_hand_landmarks.spatial_coords.index(plane[1]),
     )
 
-    palm_direction_projection = palm_direction[np.ix_(plane_ind)]
+    direction_projection = direction[np.ix_(plane_ind)]
     basis_projected_plane = np.array([1, 0])
 
-    return angle_between(palm_direction_projection, basis_projected_plane)
+    return angle_between(direction_projection, basis_projected_plane)
+
+
+@check_hand_landmark_shape
+def compute_knuckle_angle(hand: npt.NDArray, plane: tuple[str, str]) -> float:
+    knuckle_direction = compute_knuckle_direction(hand)
+    return _compute_angle(knuckle_direction, plane)
 
 
 @check_hand_landmark_shape
@@ -247,6 +257,17 @@ def compute_palm_direction(hand: npt.NDArray) -> npt.NDArray:
     # points towards the camera too
     palm_direction = np.cross(wrist_index_direction, wrist_pinky_direction)
     return palm_direction
+
+
+@check_hand_landmark_shape
+def compute_knuckle_direction(hand: npt.NDArray) -> npt.NDArray:
+    """
+    Knuckle direction as vector going from pinky knuckle to index knuckle.
+    """
+    index_knuckle = hand[utils.mediapipe_hand_landmarks.nodes.index_mcp]
+    pinky_knuckle = hand[utils.mediapipe_hand_landmarks.nodes.pinky_mcp]
+
+    return index_knuckle - pinky_knuckle
 
 
 def unit_vector(vector: npt.NDArray) -> npt.NDArray:

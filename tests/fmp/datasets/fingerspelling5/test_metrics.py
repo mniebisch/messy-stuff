@@ -148,3 +148,12 @@ def test_compute_palm_angle():
     expected = np.pi / 2
     output = metrics.compute_palm_angle(hand, plane)
     assert output == pytest.approx(expected)
+
+
+def test_compute_knuckle_angle():
+    hand = np.zeros((21, 3))
+    hand[5] = [1, 1, 0]
+    plane = ("x", "y")
+    expected = np.pi / 4
+    output = metrics.compute_knuckle_angle(hand, plane)
+    assert output == pytest.approx(expected)
