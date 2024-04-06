@@ -14,22 +14,19 @@ __all__ = [
     "compute_hand_std",
     "compute_hand_plane_area",
     "compute_hand_plane_perimeter",
+    "location_wrapper",
+    "space_wrapper",
 ]
-
-
-def get_default_args(func):
-    signature = inspect.signature(func)
-    return {
-        k: v.default
-        for k, v in signature.parameters.items()
-        if v.default is not inspect.Parameter.empty
-    }
 
 
 def check_hand_landmark_shape(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        hand = kwargs["hand"] if len(args) < 1 else args[0]
+        signature = inspect.signature(func)
+        bound = signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+
+        hand = bound.arguments["hand"]
         num_nodes = utils.mediapipe_hand_landmarks.num_nodes
         spatial_dims = len(utils.mediapipe_hand_landmarks.spatial_coords)
         if hand.shape != (num_nodes, spatial_dims):
@@ -40,14 +37,16 @@ def check_hand_landmark_shape(func):
 
 
 def location_wrapper(func):
+    # TODO register allowed functions and verify on use?
     @wraps(func)
-    def wrap_values(*args, **kwds):
-        kwargs = get_default_args(func)
-        kwargs.update(kwds)
-        part = kwargs.get("part")
-        part = args[1] if part is None else part
+    def wrap_values(*args, **kwargs):
+        signature = inspect.signature(func)
+        bound = signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+
+        part = bound.arguments["part"]
         metric_type = func.__name__.split("_")[-1]
-        values = func(*args, **kwds)
+        values = func(*args, **kwargs)
         return {
             f"{part}_{dim}_{metric_type}": val
             for val, dim in zip(values, utils.mediapipe_hand_landmarks.spatial_coords)
@@ -57,14 +56,15 @@ def location_wrapper(func):
 
 
 def space_wrapper(func):
-    def wrap_values(*args, **kwds):
-        kwargs = get_default_args(func)
-        kwargs.update(kwds)
-        part = kwargs.get("part")
-        part = args[2] if part is None else part
+    # TODO register allowed functions and verify on use?
+    def wrap_values(*args, **kwargs):
+        signature = inspect.signature(func)
+        bound = signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+
+        part = bound.arguments["part"]
         metric_type = func.__name__.split("_")[-1]
-        plane = kwargs.get("plane")
-        plane = args[1] if plane is None else plane
+        plane = bound.arguments["plane"]
         plane = "".join(plane)
 
         value = func(*args, **kwargs)

@@ -67,3 +67,34 @@ def test_compute_hand_plane_perimeter():
     expected = 4.0
     output = metrics.compute_hand_plane_perimeter(hand, ("x", "y"))
     assert output == pytest.approx(expected)
+
+
+def test_location_wrap():
+    wrapped_func = metrics.location_wrapper(metrics.compute_hand_extend)
+    hand = np.zeros((21, 3))
+    part = "thumb"
+    hand[1, 0] = 1
+    hand[1, 1] = 2
+    hand[1, 2] = 3
+    expected = {"thumb_x_extend": 1.0, "thumb_y_extend": 2.0, "thumb_z_extend": 3.0}
+    output = wrapped_func(hand, part)
+    assert output == pytest.approx(expected)
+
+
+def test_plane_wrap():
+    wrapped_func = metrics.space_wrapper(metrics.compute_hand_plane_area)
+    hand = np.zeros((21, 3))
+    part = "pinky"
+    plane = ("x", "y")
+    square_points = np.array(
+        [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [1, 0],
+        ]
+    )
+    hand[17:21, [0, 1]] = square_points
+    expected = {"pinky_xy_area": 1.0}
+    output = wrapped_func(hand, plane, part)
+    assert output == pytest.approx(expected)
