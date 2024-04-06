@@ -36,8 +36,17 @@ class HandParts:
 
 
 @dataclass(frozen=True)
+class HandNodes:
+    # mcp => kinda knuckle
+    wrist: int = 0
+    index_mcp: int = 5
+    pinky_mcp: int = 17
+
+
+@dataclass(frozen=True)
 class MediaPipeHandLandmarks:
     parts: HandParts
+    nodes: HandNodes = HandNodes()
     num_nodes: int = 21
     spatial_coords: tuple[str, str, str] = ("x", "y", "z")
 

@@ -16,6 +16,7 @@ __all__ = [
     "compute_hand_std",
     "compute_hand_plane_area",
     "compute_hand_plane_perimeter",
+    "compute_palm_angle",
     "distance_wrapper",
     "location_wrapper",
     "space_wrapper",
@@ -211,3 +212,60 @@ def compute_distances_std(hand: npt.NDArray, axis: str, part: str = "all") -> fl
     # valid axis ("xyz", "xy", "yz", "xz", "x", "y", "z")
     dist_flat = _compute_distances(hand, axis, part)
     return np.std(dist_flat)
+
+
+@check_hand_landmark_shape
+def compute_palm_angle(hand: npt.NDArray, plane: tuple[str, str]) -> float:
+    palm_direction = compute_palm_direction(hand)
+
+    plane_ind = (
+        utils.mediapipe_hand_landmarks.spatial_coords.index(plane[0]),
+        utils.mediapipe_hand_landmarks.spatial_coords.index(plane[1]),
+    )
+
+    palm_direction_projection = palm_direction[np.ix_(plane_ind)]
+    basis_projected_plane = np.array([1, 0])
+
+    return angle_between(palm_direction_projection, basis_projected_plane)
+
+
+@check_hand_landmark_shape
+def compute_palm_direction(hand: npt.NDArray) -> npt.NDArray:
+
+    wrist = hand[utils.mediapipe_hand_landmarks.nodes.wrist]
+    index_knuckle = hand[utils.mediapipe_hand_landmarks.nodes.index_mcp]
+    pinky_knuckle = hand[utils.mediapipe_hand_landmarks.nodes.pinky_mcp]
+
+    # right hand rule 'a' vector
+    wrist_index_direction = index_knuckle - wrist
+    # right hasnd rule 'b' vector
+    wrist_pinky_direction = pinky_knuckle - wrist
+
+    # considering right hand rule
+    # and given assumption that right hand was recorded
+    # cross product direction is towards the camera if the inner side of the hand
+    # points towards the camera too
+    palm_direction = np.cross(wrist_index_direction, wrist_pinky_direction)
+    return palm_direction
+
+
+def unit_vector(vector: npt.NDArray) -> npt.NDArray:
+    """Returns the unit vector of the vector."""
+    return vector / np.linalg.norm(vector)
+
+
+def angle_between(v1: npt.NDArray, v2: npt.NDArray) -> float:
+    """Returns the angle in radians between vectors 'v1' and 'v2'::
+
+    Source: https://stackoverflow.com/a/13849249
+
+    >>> angle_between((1, 0, 0), (0, 1, 0))
+    1.5707963267948966
+    >>> angle_between((1, 0, 0), (1, 0, 0))
+    0.0
+    >>> angle_between((1, 0, 0), (-1, 0, 0))
+    3.141592653589793
+    """
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))

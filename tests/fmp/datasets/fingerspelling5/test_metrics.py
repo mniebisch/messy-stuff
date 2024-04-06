@@ -138,3 +138,13 @@ def test_distance_wrap():
     expected = {"index_finger_yz_mean": 3 / 6}
     output = func(hand, axis, part)
     assert output == pytest.approx(expected)
+
+
+def test_compute_palm_angle():
+    hand = np.zeros((21, 3))
+    hand[5] = [1, 1, 0]
+    hand[17] = [1, -1, 0]
+    plane = ("x", "z")
+    expected = np.pi / 2
+    output = metrics.compute_palm_angle(hand, plane)
+    assert output == pytest.approx(expected)
