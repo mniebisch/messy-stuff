@@ -9,6 +9,7 @@ from scipy.spatial import distance
 from . import utils
 
 __all__ = [
+    "angle_wrapper",
     "compute_hand_extend",
     "compute_distances_mean",
     "compute_distances_std",
@@ -91,6 +92,24 @@ def distance_wrapper(func):
 
         value = func(*args, **kwargs)
         return {f"{part}_{axis}_{metric_type}": value}
+
+    return wrap_values
+
+
+def angle_wrapper(func):
+    # TODO register allowed functions and verify on use?
+    def wrap_values(*args, **kwargs):
+        signature = inspect.signature(func)
+        bound = signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+
+        plane = bound.arguments["plane"]
+        plane = "".join(plane)
+
+        direction_part = func.__name__.split("_")[-2]
+
+        value = func(*args, **kwargs)
+        return {f"{direction_part}_{plane}_angle": value}
 
     return wrap_values
 

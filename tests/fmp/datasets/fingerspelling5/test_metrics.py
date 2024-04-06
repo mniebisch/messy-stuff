@@ -157,3 +157,13 @@ def test_compute_knuckle_angle():
     expected = np.pi / 4
     output = metrics.compute_knuckle_angle(hand, plane)
     assert output == pytest.approx(expected)
+
+
+def test_angle_wrap():
+    func = metrics.angle_wrapper(metrics.compute_knuckle_angle)
+    hand = np.zeros((21, 3))
+    hand[5] = [1, -1, 0]
+    plane = ("y", "z")
+    expected = {"knuckle_yz_angle": np.pi}
+    output = func(hand, plane)
+    assert output == pytest.approx(expected)
