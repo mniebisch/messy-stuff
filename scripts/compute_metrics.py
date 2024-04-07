@@ -1,10 +1,27 @@
 import itertools
 from dataclasses import fields
 import functools
+from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
+from numpy import typing as npt
 
 from fmp.datasets.fingerspelling5 import metrics, utils
+
+
+def compute_metric_combinations(
+    hand: npt.NDArray,
+    func_list: List[Callable],
+    wrapper: Callable,
+    argument_collection: Tuple[List[Any], ...],
+) -> Dict[str, float]:
+    # argument_collection must match order of input arguments (TODO make robust later)
+    func_list = [wrapper(func) for func in func_list]
+    iteration_collection = (func_list, *argument_collection)
+    metric_results = [
+        func(hand, *args) for func, *args in itertools.product(*iteration_collection)
+    ]
+    return functools.reduce(lambda x, y: {**x, **y}, metric_results)
 
 
 if __name__ == "__main__":
@@ -26,40 +43,42 @@ if __name__ == "__main__":
         metrics.compute_hand_std,
         metrics.compute_hand_extend,
     ]
-    location_functions = [metrics.location_wrapper(func) for func in location_functions]
-    location_metrics = [
-        func(hand, part) for part, func in itertools.product(parts, location_functions)
-    ]
-    location_metrics = functools.reduce(lambda x, y: {**x, **y}, location_metrics)
+    location_metrics = compute_metric_combinations(
+        hand=hand,
+        func_list=location_functions,
+        wrapper=metrics.location_wrapper,
+        argument_collection=(parts,),
+    )
 
     # extract space (plane) metrics
     space_functions = [
         metrics.compute_hand_plane_area,
         metrics.compute_hand_plane_perimeter,
     ]
-    space_functions = [metrics.space_wrapper(func) for func in space_functions]
-    space_metrics = [
-        func(hand, plane, part)
-        for plane, part, func in itertools.product(planes, parts, space_functions)
-    ]
-    space_metrics = functools.reduce(lambda x, y: {**x, **y}, space_metrics)
+    space_metrics = compute_metric_combinations(
+        hand=hand,
+        func_list=space_functions,
+        wrapper=metrics.space_wrapper,
+        argument_collection=(planes, parts),
+    )
 
     # extract distance metrics
     distance_functions = [metrics.compute_distances_mean, metrics.compute_distances_std]
-    distance_functions = [metrics.distance_wrapper(func) for func in distance_functions]
-    distance_metrics = [
-        func(hand, axis, part)
-        for axis, part, func in itertools.product(axes, parts, distance_functions)
-    ]
-    distance_metrics = functools.reduce(lambda x, y: {**x, **y}, distance_metrics)
+    distance_metrics = compute_metric_combinations(
+        hand=hand,
+        func_list=distance_functions,
+        wrapper=metrics.distance_wrapper,
+        argument_collection=(axes, parts),
+    )
 
     # extract angle metrics
     angle_functions = [metrics.compute_palm_angle, metrics.compute_knuckle_angle]
-    angle_functions = [metrics.angle_wrapper(func) for func in angle_functions]
-    angle_metrics = [
-        func(hand, plane) for plane, func in itertools.product(planes, angle_functions)
-    ]
-    angle_metrics = functools.reduce(lambda x, y: {**x, **y}, angle_metrics)
+    angle_metrics = compute_metric_combinations(
+        hand=hand,
+        func_list=angle_functions,
+        wrapper=metrics.angle_wrapper,
+        argument_collection=(planes,),
+    )
 
     print(
         len(angle_metrics),
