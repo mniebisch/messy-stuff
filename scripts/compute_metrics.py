@@ -24,8 +24,9 @@ def compute_metric_combinations(
     return functools.reduce(lambda x, y: {**x, **y}, metric_results)
 
 
-if __name__ == "__main__":
-    hand = np.random.rand(21, 3)
+# TODO create class and put setup into init
+def compute_metrics(hand: npt.NDArray) -> Dict[str, float]:
+    # Setup argument iterables
     parts = [field.name for field in fields(utils.mediapipe_hand_landmarks.parts)]
     planes = list(
         itertools.combinations(utils.mediapipe_hand_landmarks.spatial_coords, 2)
@@ -37,52 +38,40 @@ if __name__ == "__main__":
     axes = [list(axis) for axis in axes]
     axes = list(itertools.chain(*axes))
     axes = ["".join(axis) for axis in axes]
-    # extract location metrics
+
+    # Setup functions
+    # TODO crawl from to be created modules to not forget update?
     location_functions = [
         metrics.compute_hand_mean,
         metrics.compute_hand_std,
         metrics.compute_hand_extend,
     ]
-    location_metrics = compute_metric_combinations(
-        hand=hand,
-        func_list=location_functions,
-        wrapper=metrics.location_wrapper,
-        argument_collection=(parts,),
-    )
-
-    # extract space (plane) metrics
     space_functions = [
         metrics.compute_hand_plane_area,
         metrics.compute_hand_plane_perimeter,
     ]
-    space_metrics = compute_metric_combinations(
-        hand=hand,
-        func_list=space_functions,
-        wrapper=metrics.space_wrapper,
-        argument_collection=(planes, parts),
-    )
-
-    # extract distance metrics
     distance_functions = [metrics.compute_distances_mean, metrics.compute_distances_std]
-    distance_metrics = compute_metric_combinations(
-        hand=hand,
-        func_list=distance_functions,
-        wrapper=metrics.distance_wrapper,
-        argument_collection=(axes, parts),
-    )
-
-    # extract angle metrics
     angle_functions = [metrics.compute_palm_angle, metrics.compute_knuckle_angle]
-    angle_metrics = compute_metric_combinations(
-        hand=hand,
-        func_list=angle_functions,
-        wrapper=metrics.angle_wrapper,
-        argument_collection=(planes,),
-    )
 
-    print(
-        len(angle_metrics),
-        len(distance_metrics),
-        len(space_metrics),
-        len(location_metrics),
-    )
+    iterables: list[tuple[list[Callable], Callable, Tuple[List[Any], ...]]] = [
+        (location_functions, metrics.location_wrapper, (parts,)),
+        (space_functions, metrics.space_wrapper, (planes, parts)),
+        (distance_functions, metrics.distance_wrapper, (axes, parts)),
+        (angle_functions, metrics.angle_wrapper, (planes,)),
+    ]
+    # compute results
+    results = [
+        compute_metric_combinations(
+            hand=hand,
+            func_list=func_list,
+            wrapper=wrapper,
+            argument_collection=argument_collection,
+        )
+        for func_list, wrapper, argument_collection in iterables
+    ]
+    return functools.reduce(lambda x, y: {**x, **y}, results)
+
+
+if __name__ == "__main__":
+    hand = np.random.rand(21, 3)
+    metrics_output = compute_metrics(hand=hand)
