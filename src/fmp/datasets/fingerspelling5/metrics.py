@@ -54,7 +54,7 @@ def location_wrapper(func):
         metric_type = func.__name__.split("_")[-1]
         values = func(*args, **kwargs)
         return {
-            f"{part}_{dim}_{metric_type}": val
+            f"loc_{part}_{dim}_{metric_type}": val
             for val, dim in zip(values, utils.mediapipe_hand_landmarks.spatial_coords)
         }
 
@@ -74,7 +74,7 @@ def space_wrapper(func):
         plane = "".join(plane)
 
         value = func(*args, **kwargs)
-        return {f"{part}_{plane}_{metric_type}": value}
+        return {f"space_{part}_{plane}_{metric_type}": value}
 
     return wrap_values
 
@@ -91,7 +91,7 @@ def distance_wrapper(func):
         axis = bound.arguments["axis"]
 
         value = func(*args, **kwargs)
-        return {f"{part}_{axis}_{metric_type}": value}
+        return {f"dist_{part}_{axis}_{metric_type}": value}
 
     return wrap_values
 
@@ -109,7 +109,7 @@ def angle_wrapper(func):
         direction_part = func.__name__.split("_")[-2]
 
         value = func(*args, **kwargs)
-        return {f"{direction_part}_{plane}_angle": value}
+        return {f"angle_{direction_part}_{plane}_angle": value}
 
     return wrap_values
 
