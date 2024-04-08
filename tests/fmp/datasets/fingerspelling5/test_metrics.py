@@ -76,7 +76,11 @@ def test_location_wrap():
     hand[1, 0] = 1
     hand[1, 1] = 2
     hand[1, 2] = 3
-    expected = {"thumb_x_extend": 1.0, "thumb_y_extend": 2.0, "thumb_z_extend": 3.0}
+    expected = {
+        "loc_thumb_x_extend": 1.0,
+        "loc_thumb_y_extend": 2.0,
+        "loc_thumb_z_extend": 3.0,
+    }
     output = wrapped_func(hand, part)
     assert output == pytest.approx(expected)
 
@@ -95,7 +99,7 @@ def test_plane_wrap():
         ]
     )
     hand[17:21, [0, 1]] = square_points
-    expected = {"pinky_xy_area": 1.0}
+    expected = {"space_pinky_xy_area": 1.0}
     output = wrapped_func(hand, plane, part)
     assert output == pytest.approx(expected)
 
@@ -135,7 +139,7 @@ def test_distance_wrap():
     part = "index_finger"
     axis = "yz"
     hand[5, 1] = 1
-    expected = {"index_finger_yz_mean": 3 / 6}
+    expected = {"dist_index_finger_yz_mean": 3 / 6}
     output = func(hand, axis, part)
     assert output == pytest.approx(expected)
 
@@ -164,6 +168,6 @@ def test_angle_wrap():
     hand = np.zeros((21, 3))
     hand[5] = [1, -1, 0]
     plane = ("y", "z")
-    expected = {"knuckle_yz_angle": np.pi}
+    expected = {"angle_knuckle_yz_angle": np.pi}
     output = func(hand, plane)
     assert output == pytest.approx(expected)
