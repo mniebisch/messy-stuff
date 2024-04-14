@@ -12,9 +12,3 @@ def cli_main():
 
 if __name__ == "__main__":
     cli_main()
-    # TODO write yaml [X]
-    # TODO add example to README [X]
-    # TODO add metric callback [X]
-    # TODO keep SCALE and NOT SCALE in mind! # maybe do afterwards and
-    # read from file name or transform config
-    # TODO apply everthing using dummy script
