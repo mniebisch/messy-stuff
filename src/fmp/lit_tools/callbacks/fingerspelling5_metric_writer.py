@@ -44,7 +44,7 @@ class Fingerseplling5MetricWriter(BasePredictionWriter):
         for hand_index in range(num_outputs):
             hand_flat = outputs[hand_index]
             hand = self.reshaper(hand_flat)
-            hand_metrics = self.metric_computer(hand)
+            hand_metrics = self.metric_computer(hand.numpy())
             self.result_collection.append(hand_metrics)
 
         return None
