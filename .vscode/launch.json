@@ -25,5 +25,35 @@
             "console": "integratedTerminal",
             "justMyCode": false
         },
+        {
+            "name": "Predict CLI",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
+            "args": [
+                "predict",
+                "--config",
+                "${workspaceFolder}/lightning_logs/version_22/config.yaml",
+                "--config",
+                "${workspaceFolder}/configs/predict_fingerspelling5.yaml",
+                "--ckpt_path",
+                "${workspaceFolder}/lightning_logs/version_22/checkpoints/epoch=17-step=36.ckpt",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Metric Computation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/compute_fingerspelling5_metrics.py",
+            "args": [
+                "predict",
+                "--config",
+                "configs/metric_computation.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
     ]
 }

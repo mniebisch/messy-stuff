@@ -23,3 +23,10 @@ python scripts/train_fingerspelling5_litcli.py predict \
     --config configs/predict_fingerspelling5.yaml \
     --ckpt_path lightning_logs/version_22/checkpoints/epoch=17-step=36.ckpt
 ```
+
+### Compute Fingerspelling5 Metrics
+
+```
+python scripts/compute_fingerspelling5_metrics.py predict \
+    --config configs/metric_computation.yaml
+```

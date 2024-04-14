@@ -1,0 +1,16 @@
+trainer:
+  accelerator: cpu
+  callbacks:
+    - class_path: fmp.lit_tools.callbacks.Fingerseplling5MetricWriter
+      init_args:
+        output_dir: ./metrics
+        output_filename: fingerspeling5_dummy.csv
+data:
+  fingerspelling5_csv: ./data/fingerspelling5_dummy_data.csv
+  batch_size: 128
+  predict_transforms:
+    class_path: torch_geometric.transforms.Compose
+    init_args:
+      transforms:
+        - class_path: torch_geometric.transforms.NormalizeScale
+return_predictions: False
