@@ -18,9 +18,9 @@ class Fingerseplling5MetricWriter(BasePredictionWriter):
         self,
         output_dir: Union[str, pathlib.Path],
         output_filename: str,
-        write_interval: (
-            Literal["batch"] | Literal["epoch"] | Literal["batch_and_epoch"]
-        ) = "batch",
+        write_interval: Union[
+            Literal["batch"], Literal["epoch"], Literal["batch_and_epoch"]
+        ] = "batch",
     ) -> None:
         super().__init__(write_interval)
         self.output_dir = pathlib.Path(output_dir)
