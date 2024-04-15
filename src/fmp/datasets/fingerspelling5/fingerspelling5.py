@@ -1,4 +1,3 @@
-import string
 from typing import Tuple, Optional
 
 import numpy as np
@@ -10,10 +9,6 @@ from torchvision.transforms import v2
 from . import utils
 
 __all__ = ["Fingerspelling5Landmark"]
-
-FINGERSPELLING5 = {
-    "letters": [letter for letter in string.ascii_lowercase if letter not in ("j", "z")]
-}
 
 
 class Fingerspelling5Landmark(Dataset):
@@ -31,7 +26,7 @@ class Fingerspelling5Landmark(Dataset):
         # mediapipe to fingerspelling5 dataset
 
         # fingerspelling5 'properties'
-        self.letters = FINGERSPELLING5["letters"]
+        self.letters = utils.fingerspelling5.letters
         self.num_letters = len(self.letters)
 
         if filter_nans:

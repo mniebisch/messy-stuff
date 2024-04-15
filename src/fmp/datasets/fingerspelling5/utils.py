@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import string
 from typing import Any, List, Union
 
 import numpy as np
@@ -15,6 +16,7 @@ __all__ = [
     "PyGDataUnwrapper",
     "NDArrayToTensor",
     "mediapipe_hand_landmarks",
+    "fingerspelling5",
 ]
 
 # Use dataclass instead?
@@ -51,6 +53,11 @@ class MediaPipeHandLandmarks:
     spatial_coords: tuple[str, str, str] = ("x", "y", "z")
 
 
+@dataclass(frozen=True)
+class Fingerspelling5:
+    letters: List[str]
+
+
 mediapipe_hand_landmarks = MediaPipeHandLandmarks(
     parts=HandParts(
         all=list(range(21)),
@@ -61,6 +68,10 @@ mediapipe_hand_landmarks = MediaPipeHandLandmarks(
         pinky=[17, 18, 19, 20],
         palm=[0, 5, 9, 13, 17],
     )
+)
+
+fingerspelling5 = Fingerspelling5(
+    letters=[letter for letter in string.ascii_lowercase if letter not in ("j", "z")]
 )
 
 
