@@ -1,6 +1,18 @@
 import pathlib
+from typing import List
 
 import pandas as pd
+from dash import Dash, Input, Output, dcc, html
+
+from fmp.datasets.fingerspelling5 import utils
+
+
+def extract_metric_columns(
+    non_variable_cols: List[str], metric_df_cols: List[str]
+) -> List[str]:
+    metric_cols = set(metric_df_cols) - set(non_variable_cols)
+    return list(metric_cols)
+
 
 # Load data
 root_path = pathlib.Path(__file__).parent.parent
@@ -32,4 +44,78 @@ fingerspelling_data = fingerspelling_data.reset_index(drop=True)
 
 predictions = pd.read_csv(predictions_file)
 
-print("Done")
+# Plotting
+
+dist_plots = {
+    "person_label": None,
+    "person": None,
+    "label": None,
+}
+
+# Create dropdown selection
+letters = utils.fingerspelling5.letters
+metric_cols = extract_metric_columns(
+    non_variable_cols=["batch_indices", "scaled"],
+    metric_df_cols=metrics.columns.tolist(),
+)
+dist_plot_options = list(dist_plots.keys())
+# App layout
+app = Dash(__name__)
+app.layout = html.Div(
+    [
+        dcc.Tabs(
+            [
+                dcc.Tab(
+                    label="overview",
+                    children=[
+                        dcc.Dropdown(
+                            letters, letters, id="overview_letter_picks", multi=True
+                        ),
+                        html.Button("empty", id="clear_button", n_clicks=0),
+                        html.Button("(m, n)", id="mn_button", n_clicks=0),
+                        html.Button("(r, u, v)", id="ruv_button", n_clicks=0),
+                        html.Button("all", id="all_button", n_clicks=0),
+                        dcc.Graph(id="graph_overview"),
+                    ],
+                ),
+                dcc.Tab(
+                    label="confusion matrix",
+                    children=[
+                        dcc.Graph(id="confusion_matrix", figure=None),
+                    ],
+                ),
+                dcc.Tab(
+                    label="scatter",
+                    children=[
+                        dcc.Dropdown(metric_cols, metric_cols[0], id="x_dim"),
+                        dcc.Dropdown(metric_cols, metric_cols[1], id="y_dim"),
+                        dcc.Dropdown(
+                            letters, letters[0], id="letter_picks", multi=True
+                        ),
+                        dcc.Graph(id="graph"),
+                    ],
+                ),
+                dcc.Tab(
+                    label="label_dist",
+                    children=[
+                        dcc.Dropdown(
+                            list(dist_plots.keys()), "person_label", id="dist_option"
+                        ),
+                        dcc.Graph(id="dist_graph"),
+                    ],
+                ),
+                dcc.Tab(
+                    label="pred metrics",
+                    children=[
+                        dcc.Graph(id="pred_metrics_agg_graph", figure=None),
+                        dcc.Graph(id="pred_metrics_label_graph", figure=None),
+                    ],
+                ),
+            ]
+        )
+    ]
+)
+
+if __name__ == "__main__":
+    app.run(debug=True)
+    print("Done")
