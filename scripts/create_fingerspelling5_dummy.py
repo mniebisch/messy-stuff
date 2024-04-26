@@ -60,7 +60,7 @@ def main(dir_dest: pathlib.Path, dataset_name: str, num_persons: int, num_sample
     dataset_dir.mkdir(parents=True, exist_ok=False)
 
     df.to_csv(dataset_dir / file_name, index=False)
-    click.echo(f"Dataset stored at '{str(dataset_dir / file_name)}.")
+    click.echo(f"Dataset stored at '{str(dataset_dir)}.")
 
 
 if __name__ == "__main__":
