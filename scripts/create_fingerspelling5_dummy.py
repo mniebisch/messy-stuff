@@ -1,26 +1,50 @@
 import pathlib
 import string
 
+import click
 import numpy as np
 import pandas as pd
 
-from fmp.datasets.fingerspelling5 import fingerspelling5, utils
+from fmp.datasets.fingerspelling5 import utils
 
-if __name__ == "__main__":
-    data_path = pathlib.Path(__file__).parent.parent / "data"
-    file_name = "fingerspelling5_dummy_data.csv"
 
-    num_persons = 5
-    letters = fingerspelling5.FINGERSPELLING5["letters"]
-    num_nodes = utils.MEDIAPIPE_HAND_LANDMARKS["num_nodes"]
-    spatial_dims = utils.MEDIAPIPE_HAND_LANDMARKS["spatial_coords"]
-    num_samples = 3
+@click.command()
+@click.option(
+    "--dir-dest",
+    required=True,
+    type=click.Path(path_type=pathlib.Path, resolve_path=True),
+    help="Directory where new dataset is stored.",
+)
+@click.option(
+    "--dataset-name",
+    required=True,
+    type=str,
+    help="Name of created dataset directory and csv file.",
+)
+@click.option(
+    "--num-persons",
+    required=True,
+    type=int,
+    help="Number of persons which are created. For each person all datasets letters are created.",
+)
+@click.option(
+    "--num-samples",
+    required=True,
+    type=int,
+    help="Number of samples per letter per person.",
+)
+def main(dir_dest: pathlib.Path, dataset_name: str, num_persons: int, num_samples: int):
+    file_name = f"{dataset_name}.csv"
+
+    letters = utils.fingerspelling5.letters
+    num_nodes = utils.mediapipe_hand_landmarks.num_nodes
+    spatial_dims = utils.mediapipe_hand_landmarks.spatial_coords
 
     num_value_cols = num_nodes * len(spatial_dims)
     num_value_rows = num_persons * num_samples * len(letters)
 
     value_column_names = utils.generate_hand_landmark_columns()
-    person_ids = [l for l in string.ascii_uppercase[:num_persons]]
+    person_ids = [letter for letter in string.ascii_uppercase[:num_persons]]
 
     numeriacal_values = np.random.rand(num_value_rows, num_value_cols)
     letter_values = np.repeat(letters, num_value_rows // len(letters))
@@ -30,6 +54,12 @@ if __name__ == "__main__":
     df["letter"] = letter_values
     df["person"] = person_id_values
 
-    df.to_csv(data_path / file_name, index=False)
+    dataset_dir = dir_dest / dataset_name
+    dataset_dir.mkdir(parents=True, exist_ok=False)
 
-    print("Done")
+    df.to_csv(dataset_dir / file_name, index=False)
+    click.echo(f"Dataset stored at '{str(dataset_dir / file_name)}.")
+
+
+if __name__ == "__main__":
+    main()

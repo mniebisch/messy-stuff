@@ -30,3 +30,14 @@ python scripts/train_fingerspelling5_litcli.py predict \
 python scripts/compute_fingerspelling5_metrics.py predict \
     --config configs/metric_computation.yaml
 ```
+
+## Synthetic Data (Or how to process a dataset)
+
+Create random dummy data which matches fingerspelling5 + mediapipe hand landmark dataset properties.
+```
+python scripts/create_fingerspelling5_dummy.py \
+    --dir-dest=data/fingerspelling5 \
+    --dataset-name=fingerspelling5_dummy \
+    --num-persons=3 \
+    --num-samples=4
+```
