@@ -41,3 +41,10 @@ python scripts/create_fingerspelling5_dummy.py \
     --num-persons=3 \
     --num-samples=4
 ```
+
+Create datasplits for fingerspelling5 mediapipe data.
+Grouped N-fold split using fingerspelling5 persons as group.
+```
+python scripts/create_fingerspelling5_splits.py \
+    --dataset-dir=data/fingerspelling5/fingerspelling5_dummy
+```
