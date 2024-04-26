@@ -43,6 +43,24 @@
             "justMyCode": false
         },
         {
+            "name": "Create Dummy Datas",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/create_fingerspelling5_dummy.py",
+            "args": [
+                "--dir-dest",
+                "data/fingerspelling5",
+                "--dataset-name",
+                "fingerspelling5_dummy",
+                "--num-persons",
+                "3",
+                "--num-samples",
+                "4"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Metric Computation",
             "type": "debugpy",
             "request": "launch",

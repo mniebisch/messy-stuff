@@ -50,7 +50,7 @@ def main(dir_dest: pathlib.Path, dataset_name: str, num_persons: int, num_sample
 
     numeriacal_values = np.random.rand(num_value_rows, num_value_cols)
     letter_values = np.repeat(letters, num_value_rows // len(letters))
-    person_id_values = np.repeat(person_ids, num_value_rows // len(person_ids))
+    person_id_values = np.array(person_ids * (num_value_rows // len(person_ids)))
 
     df = pd.DataFrame(numeriacal_values, columns=value_column_names)
     df["letter"] = letter_values
