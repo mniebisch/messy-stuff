@@ -3,6 +3,7 @@ from typing import Any, Literal, List, Dict, Union
 
 import numpy as np
 import pandas as pd
+import yaml
 from lightning import LightningModule, Trainer
 from lightning.pytorch.callbacks import BasePredictionWriter
 
@@ -56,4 +57,12 @@ class Fingerseplling5MetricWriter(BasePredictionWriter):
         batch_indices = np.arange(len(self.result_collection))
         results = pd.DataFrame(self.result_collection)
         results["batch_indices"] = batch_indices
+        # pl_module.trainer.datamodule.hparams
+
+        output_stem = str(pathlib.Path(self.output_filename).stem)
+        # with open("fu.yaml", "r") as u:
+        #     mauz = yaml.load(u, yaml.UnsafeLoader)
+        with open(self.output_dir / f"{output_stem}.yaml", "w") as hparams_file:
+            yaml.dump(pl_module.trainer.datamodule.hparams, hparams_file)
+
         results.to_csv(self.output_dir / self.output_filename, index=False)

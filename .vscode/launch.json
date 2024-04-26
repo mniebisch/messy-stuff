@@ -73,5 +73,18 @@
             "console": "integratedTerminal",
             "justMyCode": false
         },
+        {
+            "name": "Metric Computation [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/compute_fingerspelling5_metrics.py",
+            "args": [
+                "predict",
+                "--config",
+                "configs/examples/fingerspelling5_dummy_metrics.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
     ]
 }

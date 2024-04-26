@@ -48,3 +48,9 @@ Grouped N-fold split using fingerspelling5 persons as group.
 python scripts/create_fingerspelling5_splits.py \
     --dataset-dir=data/fingerspelling5/fingerspelling5_dummy
 ```
+
+Compute descriptive statistics for dataset.
+```
+python scripts/compute_fingerspelling5_metrics.py predict \
+    --config configs/examples/fingerspelling5_dummy_metrics.yaml
+```
