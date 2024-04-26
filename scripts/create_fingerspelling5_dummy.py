@@ -12,7 +12,9 @@ from fmp.datasets.fingerspelling5 import utils
 @click.option(
     "--dir-dest",
     required=True,
-    type=click.Path(path_type=pathlib.Path, resolve_path=True),
+    type=click.Path(
+        path_type=pathlib.Path, resolve_path=True, dir_okay=True, file_okay=False
+    ),
     help="Directory where new dataset is stored.",
 )
 @click.option(
