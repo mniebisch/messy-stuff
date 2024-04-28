@@ -1,0 +1,58 @@
+# lightning.pytorch==2.2.1
+trainer:
+  max_epochs: 10
+  log_every_n_steps: 1
+  check_val_every_n_epoch: 3
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: epoch
+  logger:
+    class_path: lightning.pytorch.loggers.TensorBoardLogger
+    init_args:
+      save_dir: ./logs
+      name: examples
+model:
+  input_dim: 63
+  hidden_dim: 10
+  output_dim: 24
+data:
+  dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
+  datasplit_file: ./data/fingerspelling5/fingerspelling5_dummy/split_00_fingerspelling5_dummy.csv
+  batch_size: 128
+  train_transforms:
+    class_path: torch_geometric.transforms.Compose
+    init_args:
+      transforms:
+        - class_path: torch_geometric.transforms.NormalizeScale
+        - class_path: torch_geometric.transforms.RandomFlip
+          init_args:
+            axis: 0
+        - class_path: torch_geometric.transforms.RandomJitter
+          init_args:
+            translate: 0.05
+        - class_path: torch_geometric.transforms.RandomRotate
+          init_args:
+            degrees: 20
+            axis: 0
+        - class_path: torch_geometric.transforms.RandomRotate
+          init_args:
+            degrees: 20
+            axis: 1
+        - class_path: torch_geometric.transforms.RandomRotate
+          init_args:
+            degrees: 20
+            axis: 2
+  valid_transforms:
+    class_path: torch_geometric.transforms.Compose
+    init_args:
+      transforms:
+        - class_path: torch_geometric.transforms.NormalizeScale
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 0.001
+lr_scheduler:
+  class_path: torch.optim.lr_scheduler.CosineAnnealingLR
+  init_args:
+    T_max: 20

@@ -54,3 +54,8 @@ Compute descriptive statistics for dataset.
 python scripts/compute_fingerspelling5_metrics.py predict \
     --config configs/examples/fingerspelling5_dummy_metrics.yaml
 ```
+
+```
+python scripts/train_fingerspelling5_litcli.py fit \
+     --config configs/examples/fingerspelling5_dummy_training.yaml
+```
