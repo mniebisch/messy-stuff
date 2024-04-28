@@ -27,9 +27,7 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
 
-        dataset_path = pathlib.Path(dataset_dir)
-        file_name = f"{dataset_path.name}.csv"
-        self.fingerspelling5_csv = dataset_path / file_name
+        self.fingerspelling5_csv = self.get_data_filename()
 
         self.validate_dataset_dir()
 
@@ -175,6 +173,16 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         valid_indices = split_data["split"] == "valid"
 
         return train_indices.values, valid_indices.values
+
+    def extract_dataset_name(self) -> str:
+        dataset_path = pathlib.Path(self.hparams.dataset_dir)
+        return dataset_path.name
+
+    def get_data_filename(self) -> pathlib.Path:
+        dataset_path = pathlib.Path(self.hparams.dataset_dir)
+        dataset_name = self.extract_dataset_name()
+        file_name = f"{dataset_name}.csv"
+        return dataset_path / file_name
 
 
 def _extract_data_csv_files(data_dir: pathlib.Path) -> List[pathlib.Path]:
