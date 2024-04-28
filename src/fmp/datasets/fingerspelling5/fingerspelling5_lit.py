@@ -36,14 +36,6 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         if self.hparams.datasplit_file is not None:
             self.validate_datasplit_file()
 
-    def load_datasplit_indices(self) -> Tuple[npt.NDArray, npt.NDArray]:
-        split_data = pd.read_csv(self.hparams.datasplit_file)
-
-        train_indices = split_data["split"] == "train"
-        valid_indices = split_data["split"] == "valid"
-
-        return train_indices.values, valid_indices.values
-
     def setup(self, stage: str):
         if stage == "fit":
             if self.hparams.datasplit_file is None:
@@ -175,6 +167,14 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
                 "Expect the split identifiers 'train' and 'split' but didn't found them."
             )
         # check if other elements than 'train' or 'valid' are in split col?
+
+    def load_datasplit_indices(self) -> Tuple[npt.NDArray, npt.NDArray]:
+        split_data = pd.read_csv(self.hparams.datasplit_file)
+
+        train_indices = split_data["split"] == "train"
+        valid_indices = split_data["split"] == "valid"
+
+        return train_indices.values, valid_indices.values
 
 
 def _extract_data_csv_files(data_dir: pathlib.Path) -> List[pathlib.Path]:
