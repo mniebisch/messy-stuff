@@ -99,5 +99,22 @@
             "console": "integratedTerminal",
             "justMyCode": false
         },
+        {
+            "name": "Predictions [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
+            "args": [
+                "predict",
+                "--config",
+                "logs/examples/version_0/config.yaml",
+                "--config",
+                "configs/examples/fingerspelling5_dummy_prediction.yaml",
+                "--ckpt_path",
+                "logs/examples/version_0/checkpoints/epoch=8-step=9.ckpt"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
     ]
 }

@@ -60,3 +60,11 @@ Train model using dummy data.
 python scripts/train_fingerspelling5_litcli.py fit \
      --config configs/examples/fingerspelling5_dummy_training.yaml
 ```
+
+Make prediction using trained model.
+```
+python scripts/train_fingerspelling5_litcli.py predict \
+    --config logs/examples/version_0/config.yaml \
+    --config configs/examples/fingerspelling5_dummy_prediction.yaml \
+    --ckpt_path logs/examples/version_0/checkpoints/epoch=8-step=9.ckpt
+```
