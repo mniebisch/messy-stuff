@@ -74,14 +74,27 @@
             "justMyCode": false
         },
         {
-            "name": "Metric Computation [Dummy]",
+            "name": "Metric Computation Scaled [Dummy]",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/compute_fingerspelling5_metrics.py",
             "args": [
                 "predict",
                 "--config",
-                "configs/examples/fingerspelling5_dummy_metrics.yaml"
+                "configs/examples/fingerspelling5_dummy_metrics_scaled.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Metric Computation Unscaled [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/compute_fingerspelling5_metrics.py",
+            "args": [
+                "predict",
+                "--config",
+                "configs/examples/fingerspelling5_dummy_metrics_unscaled.yaml"
             ],
             "console": "integratedTerminal",
             "justMyCode": false

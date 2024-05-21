@@ -1,0 +1,10 @@
+trainer:
+  accelerator: cpu
+  callbacks:
+    - class_path: fmp.lit_tools.callbacks.Fingerseplling5MetricWriter
+      init_args:
+        output_dir: ./metrics
+data:
+  dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
+  batch_size: 128
+return_predictions: False
