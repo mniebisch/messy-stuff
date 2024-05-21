@@ -71,13 +71,14 @@ class Fingerseplling5MetricWriter(BasePredictionWriter):
         results["batch_indices"] = batch_indices
 
         dataset_name = trainer.datamodule.extract_dataset_name()
+        pred_transforms = trainer.datamodule.predict_data._transforms
+        transform_type = get_pred_transform_name(pred_transforms)
         with open(
-            self.output_dir / f"{dataset_name}_metric_hparams.yaml", "w"
+            self.output_dir / f"{dataset_name}_{transform_type}_metric_hparams.yaml",
+            "w",
         ) as hparams_file:
             yaml.dump(pl_module.trainer.datamodule.hparams, hparams_file)
 
-        pred_transforms = trainer.datamodule.predict_data._transforms
-        transform_type = get_pred_transform_name(pred_transforms)
         output_filename = f"{dataset_name}_{transform_type}.csv"
         results.to_csv(self.output_dir / output_filename, index=False)
 
