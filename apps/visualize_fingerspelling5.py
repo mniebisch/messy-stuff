@@ -1,5 +1,5 @@
 import pathlib
-from typing import List
+from typing import Dict, List
 import re
 
 import numpy as np
@@ -7,6 +7,7 @@ import pandas as pd
 from dash import Dash, Input, Output, dcc, html
 import plotly.express as px
 import plotly.graph_objs as go
+import yaml
 
 from fmp.datasets.fingerspelling5 import utils
 
@@ -45,6 +46,25 @@ def load_metrics(metrics_root_dir: pathlib.Path, dataset_name: str) -> pd.DataFr
 
 def load_predictions(predictions_file_path: pathlib.Path) -> pd.DataFrame:
     return pd.read_csv(predictions_file_path)
+
+
+def load_predictions_hparams(predictions_file_path: pathlib.Path) -> Dict:
+    hparams_path = predictions_full_path.with_suffix(".yaml")
+    with open(hparams_path, "r") as hparams_file:
+        hparams = yaml.safe_load(hparams_file)
+    return hparams
+
+
+def load_training_datasplit(prediction_hparams: Dict) -> pd.DataFrame:
+    training_dir = pathlib.Path(prediction_hparams["ckpt"]).parent.parent
+    training_config_file = training_dir / "config.yaml"
+
+    with open(training_config_file, "r") as file:
+        training_config = yaml.safe_load(file)
+
+    datasplit_file = training_config["data"]["datasplit_file"]
+
+    return pd.read_csv(datasplit_file)
 
 
 def compute_row_facet_spacing(num_facet_rows: int) -> float:
@@ -103,6 +123,9 @@ predictions_full_path = predictions_path / "example" / predictions_filename
 fingerspelling_data = load_dataset(data_path, dataset_name)
 metrics = load_metrics(metrics_path, dataset_name)
 predictions = load_predictions(predictions_full_path)
+
+predictions_hparams = load_predictions_hparams(predictions_full_path)
+training_datasplit = load_training_datasplit(predictions_hparams)
 
 # Prepare data for plotting
 # TODO use LIT data module instead!!!!!!!!1
