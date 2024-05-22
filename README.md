@@ -71,6 +71,7 @@ python scripts/train_fingerspelling5_litcli.py fit \
 ```
 
 ### Make prediction using trained model.
+(Currently I'm not happy with the way how prediction is called(input args etc; (previous) train config + (current) pred config + model ckpt)) (too much redundancy?)
 ```
 python scripts/train_fingerspelling5_litcli.py predict \
     --config logs/examples/version_0/config.yaml \
