@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from lightning import LightningModule, Trainer
 from lightning.pytorch.callbacks import BasePredictionWriter
+import yaml
 
 __all__ = ["Fingerspelling5PredictionWriter"]
 
@@ -29,13 +30,15 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
         batch_indices: Sequence[Any],
     ) -> None:
 
-        default_root_dir = pathlib.Path(trainer.default_root_dir)
         if trainer.ckpt_path is None:
             raise ValueError
         ckpt_path = pathlib.Path(trainer.ckpt_path)
         ckpt_name = ckpt_path.stem
         ckpt_version = ckpt_path.parts[-3]
-        prediction_filename = f"prediction__{ckpt_version}__{ckpt_name}.csv"
+        prediction_name = f"prediction__{ckpt_version}__{ckpt_name}"
+        prediction_filename = prediction_name + ".csv"
+        prediction_filepath = self.output_dir / prediction_filename
+        prediction_hparams_filepath = prediction_filepath.with_suffix(".yaml")
 
         predictions = torch.concat(predictions)
         batch_indices = np.concatenate([bi for bi in batch_indices[0]], dtype=int)
@@ -43,6 +46,12 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
         results = pd.DataFrame(
             dict(batch_indices=batch_indices, predictions=predictions)
         )
-        results.to_csv(
-            default_root_dir / self.output_dir / prediction_filename, index=False
-        )
+
+        results.to_csv(prediction_filepath, index=False)
+
+        prediction_hparams = {
+            "ckpt": str(ckpt_path),
+            "prediction_output": str(prediction_filepath),
+        }
+        with open(prediction_hparams_filepath, "w") as hparams_file:
+            yaml.dump(prediction_hparams, hparams_file)
