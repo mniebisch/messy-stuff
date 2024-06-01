@@ -205,6 +205,7 @@ app.layout = html.Div(
                         html.Button("dist.*mean", id="dist_mean_button", n_clicks=0),
                         html.Button("dist.*std", id="dist_std_button", n_clicks=0),
                         html.Button("angle", id="angle_only_button", n_clicks=0),
+                        dcc.Dropdown(["scaled", "raw"], "scaled", id="scale_flag"),
                         dcc.Graph(
                             id="graph_overview",
                             style={"width": "99vw", "height": "80vh"},
@@ -254,13 +255,20 @@ app.layout = html.Div(
     Output(component_id="graph_overview", component_property="figure"),
     Input(component_id="overview_letter_picks", component_property="value"),
     Input(component_id="overview_variable_picks", component_property="value"),
+    Input(component_id="scale_flag", component_property="value"),
 )
 def update_overview(
-    overview_letter_picks: list[str], overview_variable_picks: list[str]
+    overview_letter_picks: list[str],
+    overview_variable_picks: list[str],
+    scale_flag: str,
 ):
+    # pick scaled or raw data
+    metrics_filtered = metrics_long.loc[
+        metrics_long["scaled"] == (scale_flag == "scaled")
+    ]
     # filter variables
-    variable_mask = metrics_long["variable"].isin(overview_variable_picks)
-    metrics_filtered = metrics_long.loc[variable_mask]
+    variable_mask = metrics_filtered["variable"].isin(overview_variable_picks)
+    metrics_filtered = metrics_filtered.loc[variable_mask]
 
     # filter letters
     metrics_filtered = metrics_filtered.loc[
