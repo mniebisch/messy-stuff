@@ -3,10 +3,12 @@ from typing import Dict, List
 import re
 
 import numpy as np
+from numpy import typing as npt
 import pandas as pd
 from dash import Dash, Input, Output, dcc, html
 import plotly.express as px
 import plotly.graph_objs as go
+from sklearn import metrics as sk_metrics
 import yaml
 
 from fmp.datasets.fingerspelling5 import utils
@@ -104,6 +106,25 @@ def create_metric_graph(metrics_data: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def compute_confusion_matrix(predictions: pd.DataFrame) -> npt.NDArray:
+    return sk_metrics.confusion_matrix(
+        y_true=predictions["letter"],
+        y_pred=predictions["predictions"],
+        labels=utils.fingerspelling5.letters,
+    )
+
+
+def create_confusion_matrix_graph(confusion_matrix: npt.NDArray) -> go.Figure:
+    fig = px.imshow(
+        confusion_matrix,
+        labels=dict(x="Predicted", y="Groundtruth", color="Count"),
+        x=utils.fingerspelling5.letters,
+        y=utils.fingerspelling5.letters,
+    )
+    fig.update_layout(autosize=True)
+    return fig
+
+
 # Load data
 root_path = pathlib.Path(__file__).parent.parent
 
@@ -143,6 +164,27 @@ metrics_long = pd.merge(
     on="batch_indices",
 )
 
+# Process predictions
+predictions["predictions"] = predictions["predictions"].replace(
+    {ind: letter for ind, letter in enumerate(utils.fingerspelling5.letters)}
+)
+predictions = pd.merge(
+    predictions,
+    training_datasplit[["batch_indices", "split", "letter"]],
+    on="batch_indices",
+    how="left",
+)
+
+
+# Compute confusion matrices
+confusion_matrix_train = compute_confusion_matrix(
+    predictions.loc[predictions["split"] == "train"]
+)
+confusion_matrix_valid = compute_confusion_matrix(
+    predictions.loc[predictions["split"] == "valid"]
+)
+
+
 # TODO variable filtering
 
 
@@ -154,6 +196,9 @@ metric_options = sorted(metrics_long["variable"].unique())
 def match_metric_regex(pattern: str) -> List[str]:
     return [option for option in metric_options if re.match(pattern, option)]
 
+
+fig_cf_matrix_train = create_confusion_matrix_graph(confusion_matrix_train)
+fig_cf_matrix_valid = create_confusion_matrix_graph(confusion_matrix_valid)
 
 dist_plots = {
     "person_label": None,
@@ -215,7 +260,34 @@ app.layout = html.Div(
                 dcc.Tab(
                     label="confusion matrix",
                     children=[
-                        dcc.Graph(id="confusion_matrix", figure=None),
+                        html.Div(
+                            [
+                                html.Div(
+                                    dcc.Graph(
+                                        id="confusion_matrix_train",
+                                        figure=fig_cf_matrix_train,
+                                        style={"height": "100%", "width": "100%"},
+                                    ),
+                                    style={
+                                        "display": "inline-block",
+                                        "width": "48%",
+                                        "height": "80vh",
+                                    },
+                                ),
+                                html.Div(
+                                    dcc.Graph(
+                                        id="confusion_matrix_valid",
+                                        figure=fig_cf_matrix_valid,
+                                        style={"height": "100%", "width": "100%"},
+                                    ),
+                                    style={
+                                        "display": "inline-block",
+                                        "width": "48%",
+                                        "height": "80vh",
+                                    },
+                                ),
+                            ]
+                        )
                     ],
                 ),
                 dcc.Tab(
