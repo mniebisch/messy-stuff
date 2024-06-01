@@ -95,7 +95,7 @@ def create_metric_graph(metrics_data: pd.DataFrame) -> go.Figure:
         x="letter",
         y="value",
         facet_row="variable",
-        color="letter",
+        color="split",
         facet_row_spacing=facet_row_spacing,
     )
 
@@ -126,6 +126,7 @@ predictions = load_predictions(predictions_full_path)
 
 predictions_hparams = load_predictions_hparams(predictions_full_path)
 training_datasplit = load_training_datasplit(predictions_hparams)
+training_datasplit = training_datasplit.reset_index(names=["batch_indices"])
 
 # Prepare data for plotting
 # TODO use LIT data module instead!!!!!!!!1
@@ -134,6 +135,13 @@ letter_batch_index_map["batch_indices"] = np.arange(len(letter_batch_index_map))
 
 metrics = pd.merge(metrics, letter_batch_index_map, on="batch_indices", how="left")
 metrics_long = pd.melt(metrics, id_vars=["batch_indices", "letter", "scaled"])
+
+metrics_long = pd.merge(
+    metrics_long,
+    training_datasplit[["batch_indices", "split"]],
+    how="left",
+    on="batch_indices",
+)
 
 # TODO variable filtering
 
