@@ -200,10 +200,33 @@ def match_metric_regex(pattern: str) -> List[str]:
 fig_cf_matrix_train = create_confusion_matrix_graph(confusion_matrix_train)
 fig_cf_matrix_valid = create_confusion_matrix_graph(confusion_matrix_valid)
 
+dist_orders = {
+    "letter": utils.fingerspelling5.letters,
+    "person": sorted(training_datasplit["person"].unique().tolist()),
+}
+
 dist_plots = {
-    "person_label": None,
-    "person": None,
-    "label": None,
+    "person_label": px.histogram(
+        training_datasplit,
+        x="letter",
+        color="person",
+        pattern_shape="split",
+        category_orders=dist_orders,
+        barmode="group",
+    ),
+    "person": px.histogram(
+        training_datasplit,
+        x="person",
+        color="split",
+        category_orders=dist_orders,
+    ),
+    "label": px.histogram(
+        training_datasplit,
+        x="letter",
+        color="split",
+        category_orders=dist_orders,
+        barmode="group",
+    ),
 }
 
 # Create dropdown selection
@@ -321,6 +344,14 @@ app.layout = html.Div(
         )
     ]
 )
+
+
+@app.callback(
+    Output(component_id="dist_graph", component_property="figure"),
+    Input(component_id="dist_option", component_property="value"),
+)
+def update_dist(dist_option: str):
+    return dist_plots[dist_option]
 
 
 @app.callback(
