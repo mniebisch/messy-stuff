@@ -50,6 +50,7 @@ def load_predictions(predictions_file_path: pathlib.Path) -> pd.DataFrame:
     return pd.read_csv(predictions_file_path)
 
 
+# TODO fix unused argument
 def load_predictions_hparams(predictions_file_path: pathlib.Path) -> Dict:
     hparams_path = predictions_full_path.with_suffix(".yaml")
     with open(hparams_path, "r") as hparams_file:
@@ -123,6 +124,80 @@ def create_confusion_matrix_graph(confusion_matrix: npt.NDArray) -> go.Figure:
     )
     fig.update_layout(autosize=True)
     return fig
+
+
+def calc_metrics_on_splits(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    train_split = df.loc[df["split"] == "train"]
+    valid_split = df.loc[df["split"] == "valid"]
+
+    metrics_agg_train, metrics_label_train = calc_metrics_on_split(
+        y_true=train_split["letter"], y_pred=train_split["predictions"]
+    )
+    metrics_agg_valid, metrics_label_valid = calc_metrics_on_split(
+        y_true=valid_split["letter"], y_pred=valid_split["predictions"]
+    )
+
+    metrics_agg_train["split"] = "train"
+    metrics_label_train["split"] = "train"
+
+    metrics_agg_valid["split"] = "valid"
+    metrics_label_valid["split"] = "valid"
+
+    metrics_agg = pd.concat([metrics_agg_train, metrics_agg_valid])
+    metrics_label = pd.concat([metrics_label_train, metrics_label_valid])
+
+    return metrics_agg, metrics_label
+
+
+def calc_metrics_on_split(
+    y_true: npt.NDArray, y_pred: npt.NDArray
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    labels = np.sort(np.unique(y_true))
+    recall_label = sk_metrics.recall_score(y_true, y_pred, average=None, labels=labels)
+    precision_label = sk_metrics.precision_score(
+        y_true, y_pred, average=None, labels=labels
+    )
+    f1_label = sk_metrics.f1_score(y_true, y_pred, average=None, labels=labels)
+    recall_micro = sk_metrics.recall_score(y_true, y_pred, average="micro")
+    precision_micro = sk_metrics.precision_score(y_true, y_pred, average="micro")
+    f1_micro = sk_metrics.f1_score(y_true, y_pred, average="micro")
+    recall_macro = sk_metrics.recall_score(y_true, y_pred, average="macro")
+    precision_macro = sk_metrics.precision_score(y_true, y_pred, average="macro")
+    f1_macro = sk_metrics.f1_score(y_true, y_pred, average="macro")
+    accuracy = sk_metrics.accuracy_score(y_true, y_pred)
+
+    metrics_agg = pd.DataFrame(
+        {
+            "metric": [
+                "recall_micro",
+                "recall_macro",
+                "precision_micro",
+                "precision_macro",
+                "f1_micro",
+                "f1_macro",
+                "accuracy",
+            ],
+            "value": [
+                recall_micro,
+                recall_macro,
+                precision_micro,
+                precision_macro,
+                f1_micro,
+                f1_macro,
+                accuracy,
+            ],
+        }
+    )
+    metrics_label = pd.DataFrame(
+        {
+            "recall": recall_label,
+            "precision": precision_label,
+            "f1": f1_label,
+            "label": labels,
+        }
+    )
+    metrics_label = pd.melt(metrics_label, id_vars=["label"])
+    return metrics_agg, metrics_label
 
 
 # Load data
@@ -237,6 +312,22 @@ metric_cols = extract_metric_columns(
 )
 dist_plot_options = list(dist_plots.keys())
 
+# Prediction Eval
+metrics_agg, metrics_label = calc_metrics_on_splits(predictions)
+
+
+fig_metrics_agg = px.bar(
+    metrics_agg, x="metric", y="value", color="split", barmode="group"
+)
+fig_metrics_label = px.bar(
+    metrics_label,
+    x="label",
+    y="value",
+    color="split",
+    facet_row="variable",
+    barmode="group",
+)
+
 # App layout
 app = Dash(__name__)
 app.layout = html.Div(
@@ -336,8 +427,10 @@ app.layout = html.Div(
                 dcc.Tab(
                     label="pred metrics",
                     children=[
-                        dcc.Graph(id="pred_metrics_agg_graph", figure=None),
-                        dcc.Graph(id="pred_metrics_label_graph", figure=None),
+                        dcc.Graph(id="pred_metrics_agg_graph", figure=fig_metrics_agg),
+                        dcc.Graph(
+                            id="pred_metrics_label_graph", figure=fig_metrics_label
+                        ),
                     ],
                 ),
             ]
