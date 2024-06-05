@@ -1,3 +1,4 @@
+import itertools
 import pathlib
 from typing import Dict, List
 import re
@@ -12,13 +13,6 @@ from sklearn import metrics as sk_metrics
 import yaml
 
 from fmp.datasets.fingerspelling5 import utils
-
-
-def extract_metric_columns(
-    non_variable_cols: List[str], metric_df_cols: List[str]
-) -> List[str]:
-    metric_cols = set(metric_df_cols) - set(non_variable_cols)
-    return list(metric_cols)
 
 
 def load_dataset(dataset_root_dir: pathlib.Path, dataset_name: str) -> pd.DataFrame:
@@ -200,6 +194,40 @@ def calc_metrics_on_split(
     return metrics_agg, metrics_label
 
 
+def add_letter_trace(
+    fig: go.Figure,
+    df: pd.DataFrame,
+    letter: str,
+    color: str,
+    x_var: str,
+    y_var: str,
+) -> None:
+    df_letter = df.loc[df["letter"] == letter]
+    df_correct = df_letter.loc[df_letter["predictions"] == letter]
+    df_wrong = df_letter.loc[df_letter["predictions"] != letter]
+    fig.add_trace(
+        go.Scatter(
+            name=f"'{letter}' correct",
+            x=df_correct[x_var],
+            y=df_correct[y_var],
+            mode="markers",
+            marker=dict(color=color, opacity=0.5, size=8),
+            text=df_correct["predictions"],
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            name=f"'{letter}' wrong",
+            x=df_wrong[x_var],
+            y=df_wrong[y_var],
+            mode="text",
+            text=df_wrong["predictions"],
+            textposition="middle center",
+            textfont=dict(family="sans serif", size=10, color=color),
+        )
+    )
+
+
 # Load data
 root_path = pathlib.Path(__file__).parent.parent
 
@@ -230,14 +258,15 @@ letter_batch_index_map = pd.DataFrame(fingerspelling_data["letter"])
 letter_batch_index_map["batch_indices"] = np.arange(len(letter_batch_index_map))
 
 metrics = pd.merge(metrics, letter_batch_index_map, on="batch_indices", how="left")
-metrics_long = pd.melt(metrics, id_vars=["batch_indices", "letter", "scaled"])
 
-metrics_long = pd.merge(
-    metrics_long,
+metrics = pd.merge(
+    metrics,
     training_datasplit[["batch_indices", "split"]],
     how="left",
     on="batch_indices",
 )
+
+metrics_long = pd.melt(metrics, id_vars=["batch_indices", "letter", "scaled", "split"])
 
 # Process predictions
 predictions["predictions"] = predictions["predictions"].replace(
@@ -248,6 +277,13 @@ predictions = pd.merge(
     training_datasplit[["batch_indices", "split", "letter"]],
     on="batch_indices",
     how="left",
+)
+
+metrics = pd.merge(
+    metrics,
+    predictions[["batch_indices", "predictions"]],
+    how="left",
+    on="batch_indices",
 )
 
 
@@ -306,10 +342,6 @@ dist_plots = {
 
 # Create dropdown selection
 letters = utils.fingerspelling5.letters
-metric_cols = extract_metric_columns(
-    non_variable_cols=["batch_indices", "scaled"],
-    metric_df_cols=metrics.columns.tolist(),
-)
 dist_plot_options = list(dist_plots.keys())
 
 # Prediction Eval
@@ -364,7 +396,9 @@ app.layout = html.Div(
                         html.Button("dist.*mean", id="dist_mean_button", n_clicks=0),
                         html.Button("dist.*std", id="dist_std_button", n_clicks=0),
                         html.Button("angle", id="angle_only_button", n_clicks=0),
-                        dcc.Dropdown(["scaled", "raw"], "scaled", id="scale_flag"),
+                        dcc.Dropdown(
+                            ["scaled", "raw"], "scaled", id="scale_flag_overview"
+                        ),
                         dcc.Graph(
                             id="graph_overview",
                             style={"width": "99vw", "height": "80vh"},
@@ -407,12 +441,40 @@ app.layout = html.Div(
                 dcc.Tab(
                     label="scatter",
                     children=[
-                        dcc.Dropdown(metric_cols, metric_cols[0], id="x_dim"),
-                        dcc.Dropdown(metric_cols, metric_cols[1], id="y_dim"),
+                        dcc.Dropdown(metric_options, metric_options[0], id="x_dim"),
+                        dcc.Dropdown(metric_options, metric_options[1], id="y_dim"),
                         dcc.Dropdown(
                             letters, letters[0], id="letter_picks", multi=True
                         ),
-                        dcc.Graph(id="graph"),
+                        dcc.Dropdown(
+                            ["scaled", "raw"], "scaled", id="scale_flag_scatter"
+                        ),
+                        html.Div(
+                            [
+                                html.Div(
+                                    dcc.Graph(
+                                        id="scatter_graph_train",
+                                        style={"height": "100%", "width": "100%"},
+                                    ),
+                                    style={
+                                        "display": "inline-block",
+                                        "width": "48%",
+                                        "height": "80vh",
+                                    },
+                                ),
+                                html.Div(
+                                    dcc.Graph(
+                                        id="scatter_graph_valid",
+                                        style={"height": "100%", "width": "100%"},
+                                    ),
+                                    style={
+                                        "display": "inline-block",
+                                        "width": "48%",
+                                        "height": "80vh",
+                                    },
+                                ),
+                            ]
+                        ),
                     ],
                 ),
                 dcc.Tab(
@@ -440,6 +502,76 @@ app.layout = html.Div(
 
 
 @app.callback(
+    Output(component_id="scatter_graph_train", component_property="figure"),
+    Input(component_id="x_dim", component_property="value"),
+    Input(component_id="y_dim", component_property="value"),
+    Input(component_id="letter_picks", component_property="value"),
+    Input(component_id="scale_flag_scatter", component_property="value"),
+)
+def update_scatter_train(
+    x_dim: str, y_dim: str, letter_picks: list[str], scale_flag_scatter: str
+):
+    fig = go.Figure()
+    for letter_pick, color in zip(
+        letter_picks, itertools.cycle(px.colors.qualitative.T10)
+    ):
+        metrics_wide_filtered = metrics.loc[metrics["letter"] == letter_pick]
+        metrics_wide_filtered = metrics_wide_filtered.loc[
+            metrics_wide_filtered["split"] == "train"
+        ]
+        metrics_wide_filtered = metrics_wide_filtered.loc[
+            metrics_wide_filtered["scaled"] == (scale_flag_scatter == "scaled")
+        ]
+        add_letter_trace(fig, metrics_wide_filtered, letter_pick, color, x_dim, y_dim)
+
+    x_values = metrics.loc[metrics["scaled"] == (scale_flag_scatter == "scaled"), x_dim]
+    y_values = metrics.loc[metrics["scaled"] == (scale_flag_scatter == "scaled"), y_dim]
+
+    y_min, y_max = y_values.min(), y_values.max()
+    x_min, x_max = x_values.min(), x_values.max()
+
+    fig.update_yaxes(range=[y_min, y_max])
+    fig.update_xaxes(range=[x_min, x_max])
+
+    return fig
+
+
+@app.callback(
+    Output(component_id="scatter_graph_valid", component_property="figure"),
+    Input(component_id="x_dim", component_property="value"),
+    Input(component_id="y_dim", component_property="value"),
+    Input(component_id="letter_picks", component_property="value"),
+    Input(component_id="scale_flag_scatter", component_property="value"),
+)
+def update_scatter_valid(
+    x_dim: str, y_dim: str, letter_picks: list[str], scale_flag_scatter: str
+):
+    fig = go.Figure()
+    for letter_pick, color in zip(
+        letter_picks, itertools.cycle(px.colors.qualitative.T10)
+    ):
+        metrics_wide_filtered = metrics.loc[metrics["letter"] == letter_pick]
+        metrics_wide_filtered = metrics_wide_filtered.loc[
+            metrics_wide_filtered["split"] == "valid"
+        ]
+        metrics_wide_filtered = metrics_wide_filtered.loc[
+            metrics_wide_filtered["scaled"] == (scale_flag_scatter == "scaled")
+        ]
+        add_letter_trace(fig, metrics_wide_filtered, letter_pick, color, x_dim, y_dim)
+
+    x_values = metrics.loc[metrics["scaled"] == (scale_flag_scatter == "scaled"), x_dim]
+    y_values = metrics.loc[metrics["scaled"] == (scale_flag_scatter == "scaled"), y_dim]
+
+    y_min, y_max = y_values.min(), y_values.max()
+    x_min, x_max = x_values.min(), x_values.max()
+
+    fig.update_yaxes(range=[y_min, y_max])
+    fig.update_xaxes(range=[x_min, x_max])
+
+    return fig
+
+
+@app.callback(
     Output(component_id="dist_graph", component_property="figure"),
     Input(component_id="dist_option", component_property="value"),
 )
@@ -451,16 +583,16 @@ def update_dist(dist_option: str):
     Output(component_id="graph_overview", component_property="figure"),
     Input(component_id="overview_letter_picks", component_property="value"),
     Input(component_id="overview_variable_picks", component_property="value"),
-    Input(component_id="scale_flag", component_property="value"),
+    Input(component_id="scale_flag_overview", component_property="value"),
 )
 def update_overview(
     overview_letter_picks: list[str],
     overview_variable_picks: list[str],
-    scale_flag: str,
+    scale_flag_overview: str,
 ):
     # pick scaled or raw data
     metrics_filtered = metrics_long.loc[
-        metrics_long["scaled"] == (scale_flag == "scaled")
+        metrics_long["scaled"] == (scale_flag_overview == "scaled")
     ]
     # filter variables
     variable_mask = metrics_filtered["variable"].isin(overview_variable_picks)
