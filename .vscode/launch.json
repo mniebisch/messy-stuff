@@ -61,6 +61,18 @@
             "justMyCode": false
         },
         {
+            "name": "Create Splits [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/create_fingerspelling5_splits.py",
+            "args": [
+                "--dataset-dir",
+                "data/fingerspelling5/fingerspelling5_dummy"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Metric Computation",
             "type": "debugpy",
             "request": "launch",
