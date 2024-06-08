@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn import model_selection
 
 
-from fmp.datasets.fingerspelling5 import utils
+from fmp.datasets import fingerspelling5
 
 
 @click.command()
@@ -24,12 +24,18 @@ def main(dataset_dir: pathlib.Path):
     dataset_name = dataset_dir.parts[-1]
     data_file = f"{dataset_name}.csv"
 
-    landmark_data = pd.read_csv(dataset_dir / data_file)
+    landmark_raw = pd.read_csv(dataset_dir / data_file)
+    # Hm, some coupling of 'filter_nans' with Fingerspelling5LandmarkDataModule
+    landmark_dataset = fingerspelling5.Fingerspelling5Landmark(
+        landmark_raw, filter_nans=True
+    )
+    # Hm, access private attributes
+    landmark_data = landmark_dataset._landmark_data
 
     group_colname = "person"
     groups = landmark_data["person"]
     n_splits = landmark_data[group_colname].nunique()
-    value_columns = utils.generate_hand_landmark_columns()
+    value_columns = landmark_dataset._landmark_cols
 
     X = landmark_data[value_columns].values
     y = landmark_data["letter"].values
