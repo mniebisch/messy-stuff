@@ -16,7 +16,6 @@ class Fingerspelling5Landmark(Dataset):
         self,
         hand_landmark_data: pd.DataFrame,
         transforms=None,
-        filter_nans: bool = False,
         split: Optional[str] = None,
     ):
         self.split = split
@@ -29,14 +28,7 @@ class Fingerspelling5Landmark(Dataset):
         self.letters = utils.fingerspelling5.letters
         self.num_letters = len(self.letters)
 
-        if filter_nans:
-            landmark_data = hand_landmark_data.loc[
-                ~hand_landmark_data.isnull().any(axis=1)
-            ]
-            landmark_data = landmark_data.reset_index()
-        else:
-            landmark_data = hand_landmark_data
-        self._landmark_data = landmark_data
+        self._landmark_data = hand_landmark_data
 
         # landmark data 'properties'
         self.num_features = utils.mediapipe_hand_landmarks.num_nodes * 3

@@ -1,10 +1,12 @@
 from dataclasses import dataclass
+import pathlib
 import string
-from typing import Any, List, Union
+from typing import List, Union
 
 import numpy as np
-import torch
 from numpy import typing as npt
+import pandas as pd
+import torch
 from torch_geometric import data as pyg_data
 
 __all__ = [
@@ -17,6 +19,7 @@ __all__ = [
     "NDArrayToTensor",
     "mediapipe_hand_landmarks",
     "fingerspelling5",
+    "read_csv",
 ]
 
 # Use dataclass instead?
@@ -86,6 +89,15 @@ def generate_hand_landmark_columns() -> List[str]:
         for node_ind in range(num_nodes)
         for spatial_coord in spatial_coords
     ]
+
+
+def read_csv(csv_file: Union[str, pathlib.Path], filter_nans: bool) -> pd.DataFrame:
+    landmark_data = pd.read_csv(csv_file)
+    if filter_nans:
+        landmark_data = landmark_data.loc[~landmark_data.isnull().any(axis=1)]
+        landmark_data = landmark_data.reset_index()
+
+    return landmark_data
 
 
 # could be general purpose

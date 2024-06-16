@@ -8,7 +8,7 @@ from torch.utils import data as torch_data
 from torch_geometric.transforms import BaseTransform
 from numpy import typing as npt
 
-from .fingerspelling5 import Fingerspelling5Landmark
+from fmp.datasets import fingerspelling5
 
 
 __all__ = ["Fingerspelling5LandmarkDataModule"]
@@ -35,6 +35,7 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
             self.validate_datasplit_file()
 
     def setup(self, stage: str):
+        filter_nans = True
         if stage == "fit":
             if self.hparams.datasplit_file is None:
                 raise ValueError(
@@ -42,7 +43,9 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
                     "Please provide 'datasplit_file'."
                 )
 
-            landmark_data = pd.read_csv(self.fingerspelling5_csv)
+            landmark_data = fingerspelling5.utils.read_csv(
+                self.fingerspelling5_csv, filter_nans=filter_nans
+            )
 
             self.validate_datasplit_data(landmark_data)
             # hm, can split file change between these line?
@@ -51,30 +54,29 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
             train_data = landmark_data.loc[train_index]
             valid_data = landmark_data.loc[val_index]
 
-            self.train_data = Fingerspelling5Landmark(
-                train_data, transforms=self.hparams.train_transforms, filter_nans=True
+            self.train_data = fingerspelling5.Fingerspelling5Landmark(
+                train_data, transforms=self.hparams.train_transforms
             )
-            self.valid_train_split = Fingerspelling5Landmark(
+            self.valid_train_split = fingerspelling5.Fingerspelling5Landmark(
                 train_data,
                 transforms=self.hparams.valid_transforms,
-                filter_nans=True,
                 split="train",
             )
-            self.valid_valid_split = Fingerspelling5Landmark(
+            self.valid_valid_split = fingerspelling5.Fingerspelling5Landmark(
                 valid_data,
                 transforms=self.hparams.valid_transforms,
-                filter_nans=True,
                 split="valid",
             )
 
         elif stage == "test":
             pass
         elif stage == "predict":
-            landmark_data = pd.read_csv(self.fingerspelling5_csv)
-            self.predict_data = Fingerspelling5Landmark(
+            landmark_data = fingerspelling5.utils.read_csv(
+                self.fingerspelling5_csv, filter_nans=filter_nans
+            )
+            self.predict_data = fingerspelling5.Fingerspelling5Landmark(
                 landmark_data,
                 transforms=self.hparams.predict_transforms,
-                filter_nans=True,
             )
         else:
             pass

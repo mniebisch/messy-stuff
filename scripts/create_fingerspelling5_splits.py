@@ -24,18 +24,14 @@ def main(dataset_dir: pathlib.Path):
     dataset_name = dataset_dir.parts[-1]
     data_file = f"{dataset_name}.csv"
 
-    landmark_raw = pd.read_csv(dataset_dir / data_file)
-    # Hm, some coupling of 'filter_nans' with Fingerspelling5LandmarkDataModule
-    landmark_dataset = fingerspelling5.Fingerspelling5Landmark(
-        landmark_raw, filter_nans=True
+    landmark_data = fingerspelling5.utils.read_csv(
+        dataset_dir / data_file, filter_nans=True
     )
-    # Hm, access private attributes
-    landmark_data = landmark_dataset._landmark_data
 
     group_colname = "person"
     groups = landmark_data["person"]
     n_splits = landmark_data[group_colname].nunique()
-    value_columns = landmark_dataset._landmark_cols
+    value_columns = fingerspelling5.utils.generate_hand_landmark_columns()
 
     X = landmark_data[value_columns].values
     y = landmark_data["letter"].values
