@@ -235,13 +235,15 @@ metrics_path = root_path / "metrics"
 data_path = root_path / "data" / "fingerspelling5"
 predictions_path = root_path / "predictions"
 
-dataset_name = "fingerspelling5_dummy"
+dataset_name = "fingerspelling5_singlehands"
 
 # TODO save hparams for prediction similar to metric computation
 # TODO add dataset name to pred filename? or read from yaml?
 # is going to change the most?
 predictions_filename = "prediction__version_0__epoch=8-step=9.csv"
-predictions_full_path = predictions_path / "example" / predictions_filename
+predictions_filename = "prediction__version_2__epoch=17-step=7002.csv"
+# predictions_full_path = predictions_path / "example" / predictions_filename
+predictions_full_path = predictions_path / "fingerspelling5_mlp" / predictions_filename
 # predictions_file = predictions_path / "prediction__version_22__epoch=17-step=36.csv"
 
 fingerspelling_data = load_dataset(data_path, dataset_name)
