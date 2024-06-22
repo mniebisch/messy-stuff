@@ -228,6 +228,20 @@ def add_letter_trace(
     )
 
 
+# def add_letter_column_from_data_to_metrics(metrics: pd.DataFrame, data: pd.DataFrame) -> pd.DataFrame:
+#     letter_batch_index_map = pd.DataFrame(data["letter"])
+#     letter_batch_index_map["batch_indices"] = np.arange(len(letter_batch_index_map))
+
+#     metrics = pd.merge(metrics, letter_batch_index_map, on="batch_indices", how="left")
+
+#     metrics = pd.merge(
+#         metrics,
+#         training_datasplit[["batch_indices", "split"]],
+#         how="left",
+#         on="batch_indices",
+#     )
+
+
 # Load data
 root_path = pathlib.Path(__file__).parent.parent
 
@@ -254,8 +268,12 @@ predictions_hparams = load_predictions_hparams(predictions_full_path)
 training_datasplit = load_training_datasplit(predictions_hparams)
 training_datasplit = training_datasplit.reset_index(names=["batch_indices"])
 
-# Prepare data for plotting
-# TODO use LIT data module instead!!!!!!!!1
+# load recorded data
+recorded_data = load_dataset(data_path, "fingerspelling5_singlehands_micha")
+metrics_recorded = load_metrics(metrics_path, "fingerspelling5_singlehands_micha")
+
+
+#  Add split and letter column to fingerspelling5 metrics
 letter_batch_index_map = pd.DataFrame(fingerspelling_data["letter"])
 letter_batch_index_map["batch_indices"] = np.arange(len(letter_batch_index_map))
 
@@ -267,6 +285,17 @@ metrics = pd.merge(
     how="left",
     on="batch_indices",
 )
+# Add letter column to recorded metrics
+letter_batch_index_map = pd.DataFrame(recorded_data["letter"])
+letter_batch_index_map["batch_indices"] = np.arange(len(letter_batch_index_map))
+
+metrics_recorded = pd.merge(
+    metrics_recorded, letter_batch_index_map, on="batch_indices", how="left"
+)
+# Add split column to recorded metrics
+metrics_recorded["split"] = "test"
+
+metrics = pd.concat([metrics, metrics_recorded])
 
 metrics_long = pd.melt(metrics, id_vars=["batch_indices", "letter", "scaled", "split"])
 
