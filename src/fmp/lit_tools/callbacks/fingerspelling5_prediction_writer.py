@@ -35,7 +35,8 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
         ckpt_path = pathlib.Path(trainer.ckpt_path)
         ckpt_name = ckpt_path.stem
         ckpt_version = ckpt_path.parts[-3]
-        prediction_name = f"prediction__{ckpt_version}__{ckpt_name}"
+        dataset_name = pathlib.Path(trainer.datamodule.hparams.dataset_dir).name
+        prediction_name = f"prediction__{dataset_name}__{ckpt_version}__{ckpt_name}"
         prediction_filename = prediction_name + ".csv"
         prediction_filepath = self.output_dir / prediction_filename
         prediction_hparams_filepath = prediction_filepath.with_suffix(".yaml")
