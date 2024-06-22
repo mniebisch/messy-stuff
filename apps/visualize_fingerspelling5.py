@@ -123,12 +123,16 @@ def create_confusion_matrix_graph(confusion_matrix: npt.NDArray) -> go.Figure:
 def calc_metrics_on_splits(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     train_split = df.loc[df["split"] == "train"]
     valid_split = df.loc[df["split"] == "valid"]
+    test_split = df.loc[df["split"] == "test"]
 
     metrics_agg_train, metrics_label_train = calc_metrics_on_split(
         y_true=train_split["letter"], y_pred=train_split["predictions"]
     )
     metrics_agg_valid, metrics_label_valid = calc_metrics_on_split(
         y_true=valid_split["letter"], y_pred=valid_split["predictions"]
+    )
+    metrics_agg_test, metrics_label_test = calc_metrics_on_split(
+        y_true=test_split["letter"], y_pred=test_split["predictions"]
     )
 
     metrics_agg_train["split"] = "train"
@@ -137,8 +141,13 @@ def calc_metrics_on_splits(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame
     metrics_agg_valid["split"] = "valid"
     metrics_label_valid["split"] = "valid"
 
-    metrics_agg = pd.concat([metrics_agg_train, metrics_agg_valid])
-    metrics_label = pd.concat([metrics_label_train, metrics_label_valid])
+    metrics_agg_test["split"] = "test"
+    metrics_label_test["split"] = "test"
+
+    metrics_agg = pd.concat([metrics_agg_train, metrics_agg_valid, metrics_agg_test])
+    metrics_label = pd.concat(
+        [metrics_label_train, metrics_label_valid, metrics_label_test]
+    )
 
     return metrics_agg, metrics_label
 
@@ -228,96 +237,123 @@ def add_letter_trace(
     )
 
 
-# def add_letter_column_from_data_to_metrics(metrics: pd.DataFrame, data: pd.DataFrame) -> pd.DataFrame:
-#     letter_batch_index_map = pd.DataFrame(data["letter"])
-#     letter_batch_index_map["batch_indices"] = np.arange(len(letter_batch_index_map))
-
-#     metrics = pd.merge(metrics, letter_batch_index_map, on="batch_indices", how="left")
-
-#     metrics = pd.merge(
-#         metrics,
-#         training_datasplit[["batch_indices", "split"]],
-#         how="left",
-#         on="batch_indices",
-#     )
-
-
 # Load data
 root_path = pathlib.Path(__file__).parent.parent
 
 metrics_path = root_path / "metrics"
 data_path = root_path / "data" / "fingerspelling5"
 predictions_path = root_path / "predictions"
+predictions_path = predictions_path / "fingerspelling5_mlp"
 
 dataset_name = "fingerspelling5_singlehands"
 
 # TODO save hparams for prediction similar to metric computation
 # TODO add dataset name to pred filename? or read from yaml?
 # is going to change the most?
-predictions_filename = (
-    "prediction__fingerspelling5_singlehands__version_2__epoch=17-step=7002.csv"
-)
+ckpt_name = "version_2__epoch=17-step=7002"
+predictions_filename = f"prediction__{dataset_name}__{ckpt_name}.csv"
 # predictions_full_path = predictions_path / "example" / predictions_filename
-predictions_full_path = predictions_path / "fingerspelling5_mlp" / predictions_filename
+predictions_full_path = predictions_path / predictions_filename
 # predictions_file = predictions_path / "prediction__version_22__epoch=17-step=36.csv"
 
 fingerspelling_data = load_dataset(data_path, dataset_name)
 metrics = load_metrics(metrics_path, dataset_name)
 predictions = load_predictions(predictions_full_path)
+predictions["dataset"] = dataset_name
 
 predictions_hparams = load_predictions_hparams(predictions_full_path)
 training_datasplit = load_training_datasplit(predictions_hparams)
 training_datasplit = training_datasplit.reset_index(names=["batch_indices"])
 
 # load recorded data
-recorded_data = load_dataset(data_path, "fingerspelling5_singlehands_micha")
-metrics_recorded = load_metrics(metrics_path, "fingerspelling5_singlehands_micha")
-
+recorded_dataset_name = "fingerspelling5_singlehands_micha"
+recorded_data = load_dataset(data_path, recorded_dataset_name)
+metrics_recorded = load_metrics(metrics_path, recorded_dataset_name)
+predictions_recorded_filename = f"prediction__{recorded_dataset_name}__{ckpt_name}.csv"
+predictions_recorded = load_predictions(
+    predictions_path / predictions_recorded_filename
+)
+predictions_recorded["split"] = "test"
+predictions_recorded["dataset"] = recorded_dataset_name
 
 #  Add split and letter column to fingerspelling5 metrics
 letter_batch_index_map = pd.DataFrame(fingerspelling_data["letter"])
 letter_batch_index_map["batch_indices"] = np.arange(len(letter_batch_index_map))
 
-metrics = pd.merge(metrics, letter_batch_index_map, on="batch_indices", how="left")
+metrics = pd.merge(
+    metrics, letter_batch_index_map, on="batch_indices", how="left", validate="m:1"
+)
 
 metrics = pd.merge(
     metrics,
     training_datasplit[["batch_indices", "split"]],
     how="left",
     on="batch_indices",
+    validate="m:1",
 )
 # Add letter column to recorded metrics
-letter_batch_index_map = pd.DataFrame(recorded_data["letter"])
-letter_batch_index_map["batch_indices"] = np.arange(len(letter_batch_index_map))
+letter_batch_index_map_recorded = pd.DataFrame(recorded_data["letter"])
+letter_batch_index_map_recorded["batch_indices"] = np.arange(
+    len(letter_batch_index_map_recorded)
+)
 
 metrics_recorded = pd.merge(
-    metrics_recorded, letter_batch_index_map, on="batch_indices", how="left"
+    metrics_recorded,
+    letter_batch_index_map_recorded,
+    on="batch_indices",
+    how="left",
+    validate="m:1",
 )
 # Add split column to recorded metrics
 metrics_recorded["split"] = "test"
 
+metrics["dataset"] = dataset_name
+metrics_recorded["dataset"] = recorded_dataset_name
 metrics = pd.concat([metrics, metrics_recorded])
 
-metrics_long = pd.melt(metrics, id_vars=["batch_indices", "letter", "scaled", "split"])
+metrics_long = pd.melt(
+    metrics, id_vars=["batch_indices", "letter", "scaled", "split", "dataset"]
+)
 
 # Process predictions
-predictions["predictions"] = predictions["predictions"].replace(
-    {ind: letter for ind, letter in enumerate(utils.fingerspelling5.letters)}
-)
+
+
+def map_predictions_to_letters(predictions: pd.Series) -> pd.Series:
+    return predictions.replace(
+        {ind: letter for ind, letter in enumerate(utils.fingerspelling5.letters)}
+    )
+
+
+predictions["predictions"] = map_predictions_to_letters(predictions["predictions"])
 predictions = pd.merge(
     predictions,
     training_datasplit[["batch_indices", "split", "letter"]],
     on="batch_indices",
     how="left",
+    validate="1:1",
 )
 
-metrics = pd.merge(
-    metrics,
-    predictions[["batch_indices", "predictions"]],
+predictions_recorded["predictions"] = map_predictions_to_letters(
+    predictions_recorded["predictions"]
+)
+predictions_recorded = pd.merge(
+    predictions_recorded,
+    letter_batch_index_map_recorded,
     how="left",
     on="batch_indices",
+    validate="1:1",
 )
 
+predictions = pd.concat([predictions, predictions_recorded])
+
+# TODO add 'dataset' col to on argument
+metrics = pd.merge(
+    metrics,
+    predictions[["batch_indices", "predictions", "dataset"]],
+    how="left",
+    on=["batch_indices", "dataset"],
+    validate="m:1",
+)
 
 # Compute confusion matrices
 confusion_matrix_train = compute_confusion_matrix(
@@ -325,6 +361,9 @@ confusion_matrix_train = compute_confusion_matrix(
 )
 confusion_matrix_valid = compute_confusion_matrix(
     predictions.loc[predictions["split"] == "valid"]
+)
+confusion_matrix_test = compute_confusion_matrix(
+    predictions.loc[predictions["split"] == "test"]
 )
 
 
@@ -342,11 +381,21 @@ def match_metric_regex(pattern: str) -> List[str]:
 
 fig_cf_matrix_train = create_confusion_matrix_graph(confusion_matrix_train)
 fig_cf_matrix_valid = create_confusion_matrix_graph(confusion_matrix_valid)
+fig_cf_matrix_test = create_confusion_matrix_graph(confusion_matrix_test)
+
+recorded_datasplit = recorded_data[["person", "letter"]]
+recorded_datasplit["batch_indices"] = np.arange(len(recorded_data))
+recorded_datasplit["split"] = "test"
+recorded_datasplit["dataset"] = recorded_dataset_name
+
+training_datasplit["dataset"] = dataset_name
 
 dist_orders = {
     "letter": utils.fingerspelling5.letters,
     "person": sorted(training_datasplit["person"].unique().tolist()),
 }
+
+training_datasplit = pd.concat([training_datasplit, recorded_datasplit])
 
 dist_plots = {
     "person_label": px.histogram(
@@ -450,7 +499,7 @@ app.layout = html.Div(
                                     ),
                                     style={
                                         "display": "inline-block",
-                                        "width": "48%",
+                                        "width": "30%",
                                         "height": "80vh",
                                     },
                                 ),
@@ -462,7 +511,19 @@ app.layout = html.Div(
                                     ),
                                     style={
                                         "display": "inline-block",
-                                        "width": "48%",
+                                        "width": "30%",
+                                        "height": "80vh",
+                                    },
+                                ),
+                                html.Div(
+                                    dcc.Graph(
+                                        id="confusion_matrix_test",
+                                        figure=fig_cf_matrix_test,
+                                        style={"height": "100%", "width": "100%"},
+                                    ),
+                                    style={
+                                        "display": "inline-block",
+                                        "width": "30%",
                                         "height": "80vh",
                                     },
                                 ),
@@ -490,7 +551,7 @@ app.layout = html.Div(
                                     ),
                                     style={
                                         "display": "inline-block",
-                                        "width": "48%",
+                                        "width": "30%",
                                         "height": "80vh",
                                     },
                                 ),
@@ -501,7 +562,18 @@ app.layout = html.Div(
                                     ),
                                     style={
                                         "display": "inline-block",
-                                        "width": "48%",
+                                        "width": "30%",
+                                        "height": "80vh",
+                                    },
+                                ),
+                                html.Div(
+                                    dcc.Graph(
+                                        id="scatter_graph_test",
+                                        style={"height": "100%", "width": "100%"},
+                                    ),
+                                    style={
+                                        "display": "inline-block",
+                                        "width": "30%",
                                         "height": "80vh",
                                     },
                                 ),
@@ -585,6 +657,41 @@ def update_scatter_valid(
         metrics_wide_filtered = metrics.loc[metrics["letter"] == letter_pick]
         metrics_wide_filtered = metrics_wide_filtered.loc[
             metrics_wide_filtered["split"] == "valid"
+        ]
+        metrics_wide_filtered = metrics_wide_filtered.loc[
+            metrics_wide_filtered["scaled"] == (scale_flag_scatter == "scaled")
+        ]
+        add_letter_trace(fig, metrics_wide_filtered, letter_pick, color, x_dim, y_dim)
+
+    x_values = metrics.loc[metrics["scaled"] == (scale_flag_scatter == "scaled"), x_dim]
+    y_values = metrics.loc[metrics["scaled"] == (scale_flag_scatter == "scaled"), y_dim]
+
+    y_min, y_max = y_values.min(), y_values.max()
+    x_min, x_max = x_values.min(), x_values.max()
+
+    fig.update_yaxes(range=[y_min, y_max])
+    fig.update_xaxes(range=[x_min, x_max])
+
+    return fig
+
+
+@app.callback(
+    Output(component_id="scatter_graph_test", component_property="figure"),
+    Input(component_id="x_dim", component_property="value"),
+    Input(component_id="y_dim", component_property="value"),
+    Input(component_id="letter_picks", component_property="value"),
+    Input(component_id="scale_flag_scatter", component_property="value"),
+)
+def update_scatter_test(
+    x_dim: str, y_dim: str, letter_picks: list[str], scale_flag_scatter: str
+):
+    fig = go.Figure()
+    for letter_pick, color in zip(
+        letter_picks, itertools.cycle(px.colors.qualitative.T10)
+    ):
+        metrics_wide_filtered = metrics.loc[metrics["letter"] == letter_pick]
+        metrics_wide_filtered = metrics_wide_filtered.loc[
+            metrics_wide_filtered["split"] == "test"
         ]
         metrics_wide_filtered = metrics_wide_filtered.loc[
             metrics_wide_filtered["scaled"] == (scale_flag_scatter == "scaled")
