@@ -74,25 +74,9 @@ def compute_knuckle_direction(hand: npt.NDArray) -> npt.NDArray:
 
 
 def angle_between(v1: npt.NDArray, v2: npt.NDArray) -> float:
-    """Returns the angle in radians between vectors 'v1' and 'v2'::
+    angle = np.arctan2(np.linalg.det([v1, v2]), np.dot(v1, v2))
 
-    Source: https://stackoverflow.com/a/13849249
-
-    >>> angle_between((1, 0, 0), (0, 1, 0))
-    1.5707963267948966
-    >>> angle_between((1, 0, 0), (1, 0, 0))
-    0.0
-    >>> angle_between((1, 0, 0), (-1, 0, 0))
-    3.141592653589793
-    """
-    v1_u = unit_vector(v1)
-    v2_u = unit_vector(v2)
-    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
-
-
-def unit_vector(vector: npt.NDArray) -> npt.NDArray:
-    """Returns the unit vector of the vector."""
-    return vector / np.linalg.norm(vector)
+    return angle
 
 
 def _compute_angle(direction: npt.NDArray, plane: tuple[str, str]) -> float:
@@ -103,4 +87,4 @@ def _compute_angle(direction: npt.NDArray, plane: tuple[str, str]) -> float:
     direction_projection = direction[np.ix_(plane_ind)]
     basis_projected_plane = np.array([1, 0])
 
-    return angle_between(direction_projection, basis_projected_plane)
+    return angle_between(basis_projected_plane, direction_projection)
