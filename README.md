@@ -78,3 +78,7 @@ python scripts/train_fingerspelling5_litcli.py predict \
     --config configs/examples/fingerspelling5_dummy_prediction.yaml \
     --ckpt_path logs/examples/version_0/checkpoints/epoch=8-step=9.ckpt
 ```
+
+
+# Links
+- [Mediapipe Hand Landmarks](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker/python)
