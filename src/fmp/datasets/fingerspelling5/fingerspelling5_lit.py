@@ -19,6 +19,7 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         self,
         dataset_dir: str,
         batch_size: int,
+        num_dataloader_workers: int = 0,
         train_transforms: Optional[BaseTransform] = None,
         valid_transforms: Optional[BaseTransform] = None,
         predict_transforms: Optional[BaseTransform] = None,
@@ -90,6 +91,7 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
             batch_size=self.hparams.batch_size,
             shuffle=True,
             drop_last=True,
+            num_workers=self.hparams.num_dataloader_workers,
         )
 
     def val_dataloader(self) -> List[torch_data.DataLoader]:
@@ -98,12 +100,14 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
             batch_size=self.hparams.batch_size,
             shuffle=False,
             drop_last=False,
+            num_workers=self.hparams.num_dataloader_workers,
         )
         valid_loader = torch_data.DataLoader(
             self.valid_valid_split,
             batch_size=self.hparams.batch_size,
             shuffle=False,
             drop_last=False,
+            num_workers=self.hparams.num_dataloader_workers,
         )
         return [train_loader, valid_loader]
 
@@ -116,6 +120,7 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
             batch_size=self.hparams.batch_size,
             shuffle=False,
             drop_last=False,
+            num_workers=self.hparams.num_dataloader_workers,
         )
 
     def validate_dataset_dir(self) -> None:
