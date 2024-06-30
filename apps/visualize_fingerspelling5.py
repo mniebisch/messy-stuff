@@ -236,6 +236,35 @@ def add_letter_trace(
         )
     )
 
+    x_hist = go.Histogram(
+        x=df_letter[x_var],
+        nbinsx=50,
+        yaxis="y2",
+        histnorm="",
+        marker=dict(color=color),
+        showlegend=False,
+    )
+    y_hist = go.Histogram(
+        y=df_letter[y_var],
+        nbinsy=50,
+        xaxis="x2",
+        histnorm="",
+        orientation="h",
+        marker=dict(color=color),
+        showlegend=False,
+    )
+    fig.add_trace(x_hist)
+    fig.add_trace(y_hist)
+
+    fig.update_layout(
+        xaxis=dict(domain=[0, 0.85], showgrid=True),
+        yaxis=dict(domain=[0, 0.85], showgrid=True),
+        xaxis2=dict(domain=[0.85, 1], showgrid=True, autorange=True),
+        yaxis2=dict(domain=[0.85, 1], showgrid=True, autorange=True),
+        bargap=0.1,
+        bargroupgap=0.1,
+    )
+
 
 # Load data
 root_path = pathlib.Path(__file__).parent.parent
@@ -250,7 +279,7 @@ dataset_name = "fingerspelling5_singlehands"
 # TODO save hparams for prediction similar to metric computation
 # TODO add dataset name to pred filename? or read from yaml?
 # is going to change the most?
-ckpt_name = "version_2__epoch=17-step=7002"
+ckpt_name = "version_4__epoch=17-step=7002"
 predictions_filename = f"prediction__{dataset_name}__{ckpt_name}.csv"
 # predictions_full_path = predictions_path / "example" / predictions_filename
 predictions_full_path = predictions_path / predictions_filename
