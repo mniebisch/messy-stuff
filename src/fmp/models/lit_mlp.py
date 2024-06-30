@@ -17,6 +17,8 @@ class LitMLP(L.LightningModule):
         input_dim: int,
         hidden_dim: int,
         output_dim: int,
+        apply_dropout: bool = False,
+        dropout_rate: float = 0.5,
     ):
         super().__init__()
 
@@ -28,10 +30,20 @@ class LitMLP(L.LightningModule):
         self.output_layer = nn.Linear(hidden_dim, output_dim)
         self.relu = nn.ReLU()
 
+        self.dropout1 = nn.Dropout(dropout_rate)
+        self.dropout2 = nn.Dropout(dropout_rate)
+        self.dropout3 = nn.Dropout(dropout_rate)
+
     def forward(self, x):
         x = self.relu(self.input_layer(x))
+        if self.hparams.apply_dropout:
+            x = self.dropout1(x)
         x = self.relu(self.hidden_layer1(x))
+        if self.hparams.apply_dropout:
+            x = self.dropout2(x)
         x = self.relu(self.hidden_layer2(x))
+        if self.hparams.apply_dropout:
+            x = self.dropout3(x)
         x = self.output_layer(x)
         return x
 
