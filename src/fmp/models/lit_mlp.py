@@ -1,11 +1,11 @@
 from typing import Tuple, List
 
 import lightning as L
-import torch.nn as nn
 from torch.nn import functional as F
-import torch.optim as optim
 
 import torch
+
+from fmp.models import mlp
 
 __all__ = ["LitMLP"]
 
@@ -15,8 +15,9 @@ class LitMLP(L.LightningModule):
     def __init__(
         self,
         input_dim: int,
-        hidden_dim: int,
+        hidden_dims: List[int],
         output_dim: int,
+        apply_batchnorm: bool = False,
         apply_dropout: bool = False,
         dropout_rate: float = 0.5,
     ):
@@ -24,28 +25,17 @@ class LitMLP(L.LightningModule):
 
         self.save_hyperparameters()
 
-        self.input_layer = nn.Linear(input_dim, hidden_dim)
-        self.hidden_layer1 = nn.Linear(hidden_dim, hidden_dim)
-        self.hidden_layer2 = nn.Linear(hidden_dim, hidden_dim)
-        self.output_layer = nn.Linear(hidden_dim, output_dim)
-        self.relu = nn.ReLU()
+        self.mlp = mlp.MLP(
+            input_dim=input_dim,
+            hidden_dims=hidden_dims,
+            output_dim=output_dim,
+            apply_batchnorm=apply_batchnorm,
+            apply_dropout=apply_dropout,
+            dropout_rate=dropout_rate,
+        )
 
-        self.dropout1 = nn.Dropout(dropout_rate)
-        self.dropout2 = nn.Dropout(dropout_rate)
-        self.dropout3 = nn.Dropout(dropout_rate)
-
-    def forward(self, x):
-        x = self.relu(self.input_layer(x))
-        if self.hparams.apply_dropout:
-            x = self.dropout1(x)
-        x = self.relu(self.hidden_layer1(x))
-        if self.hparams.apply_dropout:
-            x = self.dropout2(x)
-        x = self.relu(self.hidden_layer2(x))
-        if self.hparams.apply_dropout:
-            x = self.dropout3(x)
-        x = self.output_layer(x)
-        return x
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.mlp(x)
 
     def training_step(
         self,
