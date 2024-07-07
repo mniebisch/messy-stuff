@@ -12,6 +12,7 @@ trainer:
     init_args:
       save_dir: ./logs
       name: examples
+      log_graph: true
 model:
   input_dim: 63
   hidden_dims: [10, 10]

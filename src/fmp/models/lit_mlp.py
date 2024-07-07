@@ -25,6 +25,8 @@ class LitMLP(L.LightningModule):
 
         self.save_hyperparameters()
 
+        self.example_input_array = torch.rand(1, input_dim)
+
         self.mlp = mlp.MLP(
             input_dim=input_dim,
             hidden_dims=hidden_dims,
