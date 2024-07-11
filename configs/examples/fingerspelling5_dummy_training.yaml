@@ -14,12 +14,14 @@ trainer:
       name: examples
       log_graph: true
 model:
-  input_dim: 63
-  hidden_dims: [10, 10]
-  output_dim: 24
-  apply_batchnorm: true
-  apply_dropout: true
-  dropout_rate: 0.2
+  class_path: fmp.models.SingleLayerMLP
+  init_args:
+    input_dim: 63
+    hidden_dim: 10
+    output_dim: 24
+    apply_batchnorm: true
+    apply_dropout: true
+    dropout_rate: 0.2
 data:
   dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
   datasplit_file: ./data/fingerspelling5/fingerspelling5_dummy/split_00_fingerspelling5_dummy.csv
