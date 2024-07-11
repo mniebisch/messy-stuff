@@ -8,6 +8,8 @@ from lightning import LightningModule, Trainer
 from lightning.pytorch.callbacks import BasePredictionWriter
 import yaml
 
+from fmp.datasets import fingerspelling5
+
 __all__ = ["Fingerspelling5PredictionWriter"]
 
 
@@ -35,7 +37,10 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
         ckpt_path = pathlib.Path(trainer.ckpt_path)
         ckpt_name = ckpt_path.stem
         ckpt_version = ckpt_path.parts[-3]
-        dataset_name = pathlib.Path(trainer.datamodule.hparams.dataset_dir).name
+        datamodule: fingerspelling5.Fingerspelling5LandmarkDataModule = (
+            trainer.datamodule
+        )
+        dataset_name = pathlib.Path(datamodule.dataset_dir).name
         prediction_name = f"prediction__{dataset_name}__{ckpt_version}__{ckpt_name}"
         prediction_filename = prediction_name + ".csv"
         prediction_filepath = self.output_dir / prediction_filename

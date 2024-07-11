@@ -77,7 +77,7 @@ class Fingerseplling5MetricWriter(BasePredictionWriter):
             self.output_dir / f"{dataset_name}_{transform_type}_metric_hparams.yaml",
             "w",
         ) as hparams_file:
-            yaml.dump(pl_module.trainer.datamodule.hparams, hparams_file)
+            yaml.dump(trainer.datamodule.hparams, hparams_file)
 
         output_filename = f"{dataset_name}_{transform_type}.csv"
         results.to_csv(self.output_dir / output_filename, index=False)
