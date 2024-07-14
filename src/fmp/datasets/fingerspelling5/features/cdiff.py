@@ -1,10 +1,9 @@
 import torch
 
-__all__ = ["cdist_combination"]
+__all__ = ["cdiff_combination"]
 
 
-# TODO rename as cdist is not completely correct? rename to cdiff?
-def cdist_combination(spatial_coords: torch.Tensor) -> torch.Tensor:
+def cdiff_combination(spatial_coords: torch.Tensor) -> torch.Tensor:
     if spatial_coords.dim() == 2:
         num_values = len(spatial_coords)
     elif spatial_coords.dim() == 3:

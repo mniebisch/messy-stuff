@@ -1,3 +1,3 @@
-from fmp.datasets.fingerspelling5.features import cdist
+from fmp.datasets.fingerspelling5.features import cdiff
 
-__all__ = ["cdist"]
+__all__ = ["cdiff"]
