@@ -20,6 +20,7 @@ __all__ = [
     "mediapipe_hand_landmarks",
     "fingerspelling5",
     "read_csv",
+    "is_any_invalid_attribute_set",
 ]
 
 # Use dataclass instead?
@@ -100,6 +101,12 @@ def read_csv(csv_file: Union[str, pathlib.Path], filter_nans: bool) -> pd.DataFr
     return landmark_data
 
 
+def is_any_invalid_attribute_set(graph: pyg_data.Data) -> bool:
+    return any(
+        [value is not None and key != "pos" for key, value in graph.to_dict().items()]
+    )
+
+
 # could be general purpose
 class OneHotLabel(object):
     def __init__(self, num_classes: int):
@@ -133,6 +140,12 @@ class PyGDataWrapper(object):
 
 class PyGDataUnwrapper(object):
     def __call__(self, graph: pyg_data.Data) -> torch.Tensor:
+        if is_any_invalid_attribute_set(graph):
+            raise ValueError(
+                "Transform will invalidate previous node structure. "
+                "No attribute besides 'pos' is allowed to be set."
+                "Please check the pipeline."
+            )
         return graph.pos
 
 
