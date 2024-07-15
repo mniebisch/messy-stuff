@@ -8,7 +8,7 @@ __all__ = ["NodeCDiff"]
 
 
 class NodeCDiff(pyg_transforms.BaseTransform):
-    def forward(self, data: pyg_data.Data) -> pyg_data.Data:
+    def __call__(self, data: pyg_data.Data) -> pyg_data.Data:
         if data.pos is None:
             raise ValueError("Invalid 'pos' input.")
 
