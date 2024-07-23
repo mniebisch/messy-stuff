@@ -124,10 +124,10 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
     def predict_dataloader(self):
         return torch_data.DataLoader(
             self.predict_data,
-            batch_size=self.hparams.batch_size,
+            batch_size=self.batch_size,
             shuffle=False,
             drop_last=False,
-            num_workers=self.hparams.num_dataloader_workers,
+            num_workers=self.num_dataloader_workers,
         )
 
     def validate_dataset_dir(
