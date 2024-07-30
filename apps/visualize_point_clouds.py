@@ -211,7 +211,7 @@ app.layout = html.Div(
         dcc.Dropdown(options=letters, value=letters[0], id="letter_id"),
         dcc.Dropdown(options=persons, value=persons[0], id="person_id"),
         dcc.Dropdown(options=frame_ids[persons[0]], id="frame_id"),
-        dcc.Graph(id="3d_figure"),
+        dcc.Graph(id="3d_figure", style={"height": "80vh", "width": "95vw"}),
     ]
 )
 
@@ -281,6 +281,14 @@ def create_3d_scatter(letter_id: str, person_id: str, frame_id: str):
                 name="Connection",
             )
         )
+
+    camera = dict(
+        up=dict(x=0, y=-1, z=0),
+        center=dict(x=0, y=0, z=0),
+        eye=dict(x=0, y=0, z=-2),
+    )
+    scatter_fig.update_layout(scene_camera=camera)
+
     return scatter_fig
 
 
