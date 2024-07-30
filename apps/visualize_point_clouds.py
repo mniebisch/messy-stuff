@@ -1,3 +1,4 @@
+import collections
 import pathlib
 
 from dash import Dash, Input, Output, dcc, html
@@ -103,86 +104,142 @@ def create_landmark_volume(
     return volume
 
 
-if __name__ == "__main__":
+data_dir = pathlib.Path(__file__).parent.parent / "data" / "fingerspelling5"
+dataset_name = "fingerspelling5_singlehands"
+vis_dir = data_dir / dataset_name / "vis_data"
+filename = f"{dataset_name}_vis_data.csv"
 
-    data = pathlib.Path(__file__).parent.parent
-    data = (
-        data
-        / "data"
-        / "fingerspelling5"
-        / "fingerspelling5_singlehands"
-        / "fingerspelling5_singlehands.csv"
-    )
+vis_data = pd.read_csv(vis_dir / filename, dtype={"landmark_id": str})
 
-    raw_data = fingerspelling5.utils.read_csv(data, filter_nans=True)
-    data_module = fingerspelling5.Fingerspelling5Landmark(raw_data)
 
-    data_transforms = v2.Compose(
-        [
-            data_module._setup_landmark_pre_transforms(),
-            pyg_transforms.NormalizeScale(),
-            fingerspelling5.utils.PyGDataUnwrapper(),
-        ],
-    )
+# colors = ["Blues", "Greens", "Greys", "Reds", "Purples"]
+# volumes = []
+# for i, color in zip(
+#     fingerspelling5.utils.mediapipe_hand_landmarks.parts.all,
+#     itertools.cycle(colors),
+# ):
+#     row_selection = (
+#         (vis_data["letter"] == "l")
+#         & (vis_data["person"] == "A")
+#         & (vis_data["landmark_id"] == str(i))
+#     )
+#     letter_cols = data_module._landmark_cols
+#     scatter_data = vis_data.loc[row_selection]
+#     gmm_data = vis_data.loc[row_selection, ["x", "y", "z"]].values
 
-    landmark_data = data_module._landmark_data.loc[:, data_module._landmark_cols].values
-    landmark_data = landmark_data.astype(np.float32)
-    letter_data = data_module._landmark_data.loc[:, "letter"].values
-    person_data = data_module._landmark_data.loc[:, "person"].values
+#     volume = create_landmark_volume(gmm_data, str(i), color)
+#     volumes.append(volume)
 
-    vis_data = [
-        create_hand_dataframe(
-            hand_flat=hand_flat,
-            letter=letter,
-            person=person,
-            hand_transform=data_transforms,
-            frame_id=frame_id,
-        )
-        for frame_id, (hand_flat, letter, person) in enumerate(
-            zip(landmark_data, letter_data, person_data)
-        )
-        if letter == "f" and person == "B"
+# fig = go.Figure(data=volumes)
+# fig.show()
+
+# kd = neighbors.KernelDensity(bandwidth=0.01)
+# kd.fit(gmm_data)
+# log_likelihood_kd = kd.score_samples(pred_values)
+# likelihood_kd = np.exp(log_likelihood_kd)
+
+# volume2 = go.Volume(
+#     x=x_grid.flatten(),
+#     y=y_grid.flatten(),
+#     z=z_grid.flatten(),
+#     value=likelihood_kd.flatten(),<
+#     opacity=0.1,  # needs to be small to see through all surfaces
+#     colorscale="Oranges",
+#     surface_count=40,  # needs to be a large number for good volume rendering
+# )
+
+# scatter_fig = px.scatter_3d(
+#     vis_data,
+#     x="x",
+#     y="y",
+#     z="z",
+#     color="landmark_id",
+#     symbol="person",
+#     opacity=0.25,
+#     color_discrete_sequence=px.colors.qualitative.Dark24,
+#     hover_data="frame_id",
+# )
+
+# example_df = vis_data.loc[vis_data["frame_id"] == 51187]
+# hand_fig = px.scatter_3d(
+#     example_df,
+#     x="x",
+#     y="y",
+#     z="z",
+#     color="landmark_id",
+#     symbol="person",
+#     color_discrete_sequence=px.colors.qualitative.Dark24,
+#     hover_data="frame_id",
+# )
+# scatter_fig.add_traces(hand_fig.data)
+
+# for connection in connections:
+#     node_a_id, node_b_id = connection
+#     # assumption: "row" only contains one element
+#     node_a_row = example_df.loc[example_df["landmark_id"] == str(node_a_id)]
+#     node_b_row = example_df.loc[example_df["landmark_id"] == str(node_b_id)]
+#     x_vals = [node_a_row["x"].values[0], node_b_row["x"].values[0]]
+#     y_vals = [node_a_row["y"].values[0], node_b_row["y"].values[0]]
+#     z_vals = [node_a_row["z"].values[0], node_b_row["z"].values[0]]
+
+#     scatter_fig.add_trace(
+#         go.Scatter3d(
+#             x=x_vals,
+#             y=y_vals,
+#             z=z_vals,
+#             mode="lines",
+#             line=dict(color="black"),
+#             name="Connection",
+#         )
+#     )
+
+
+persons = sorted(vis_data["person"].unique().tolist())
+letters = fingerspelling5.utils.fingerspelling5.letters
+
+frame_ids = collections.defaultdict(dict)
+for person in persons:
+    for letter in letters:
+        df = vis_data.loc[
+            (vis_data["person"] == person) & (vis_data["letter"] == letter)
+        ]
+        frame_ids[person][letter] = df["frame_id"].unique().tolist()
+
+app = Dash(__name__)
+app.layout = html.Div(
+    [
+        dcc.Dropdown(options=letters, value=letters[0], id="letter_id"),
+        dcc.Dropdown(options=persons, value=persons[0], id="person_id"),
+        dcc.Dropdown(options=frame_ids[persons[0]], id="frame_id"),
+        dcc.Graph(id="3d_figure"),
     ]
-    vis_data = pd.concat(vis_data)
+)
 
-    # colors = ["Blues", "Greens", "Greys", "Reds", "Purples"]
-    # volumes = []
-    # for i, color in zip(
-    #     fingerspelling5.utils.mediapipe_hand_landmarks.parts.all,
-    #     itertools.cycle(colors),
-    # ):
-    #     row_selection = (
-    #         (vis_data["letter"] == "l")
-    #         & (vis_data["person"] == "A")
-    #         & (vis_data["landmark_id"] == str(i))
-    #     )
-    #     letter_cols = data_module._landmark_cols
-    #     scatter_data = vis_data.loc[row_selection]
-    #     gmm_data = vis_data.loc[row_selection, ["x", "y", "z"]].values
 
-    #     volume = create_landmark_volume(gmm_data, str(i), color)
-    #     volumes.append(volume)
+@app.callback(
+    Output("frame_id", "options"),
+    Output("frame_id", "value"),
+    Input("person_id", "value"),
+    Input("letter_id", "value"),
+)
+def update_frame_ids(person_id, letter_id):
+    options = frame_ids[person_id][letter_id]
+    value = options[0]
+    return options, value
 
-    # fig = go.Figure(data=volumes)
-    # fig.show()
 
-    # kd = neighbors.KernelDensity(bandwidth=0.01)
-    # kd.fit(gmm_data)
-    # log_likelihood_kd = kd.score_samples(pred_values)
-    # likelihood_kd = np.exp(log_likelihood_kd)
-
-    # volume2 = go.Volume(
-    #     x=x_grid.flatten(),
-    #     y=y_grid.flatten(),
-    #     z=z_grid.flatten(),
-    #     value=likelihood_kd.flatten(),<
-    #     opacity=0.1,  # needs to be small to see through all surfaces
-    #     colorscale="Oranges",
-    #     surface_count=40,  # needs to be a large number for good volume rendering
-    # )
-
+@app.callback(
+    Output("3d_figure", "figure"),
+    Input("letter_id", "value"),
+    Input("person_id", "value"),
+    Input("frame_id", "value"),
+)
+def create_3d_scatter(letter_id: str, person_id: str, frame_id: str):
+    scatter_data = vis_data.loc[
+        (vis_data["person"] == person_id) & (vis_data["letter"] == letter_id)
+    ]
     scatter_fig = px.scatter_3d(
-        vis_data,
+        scatter_data,
         x="x",
         y="y",
         z="z",
@@ -192,10 +249,9 @@ if __name__ == "__main__":
         color_discrete_sequence=px.colors.qualitative.Dark24,
         hover_data="frame_id",
     )
-
-    example_df = vis_data.loc[vis_data["frame_id"] == 51187]
+    hand_data = scatter_data.loc[scatter_data["frame_id"] == frame_id]
     hand_fig = px.scatter_3d(
-        example_df,
+        hand_data,
         x="x",
         y="y",
         z="z",
@@ -209,8 +265,8 @@ if __name__ == "__main__":
     for connection in connections:
         node_a_id, node_b_id = connection
         # assumption: "row" only contains one element
-        node_a_row = example_df.loc[example_df["landmark_id"] == str(node_a_id)]
-        node_b_row = example_df.loc[example_df["landmark_id"] == str(node_b_id)]
+        node_a_row = hand_data.loc[hand_data["landmark_id"] == str(node_a_id)]
+        node_b_row = hand_data.loc[hand_data["landmark_id"] == str(node_b_id)]
         x_vals = [node_a_row["x"].values[0], node_b_row["x"].values[0]]
         y_vals = [node_a_row["y"].values[0], node_b_row["y"].values[0]]
         z_vals = [node_a_row["z"].values[0], node_b_row["z"].values[0]]
@@ -225,8 +281,11 @@ if __name__ == "__main__":
                 name="Connection",
             )
         )
+    return scatter_fig
 
-    scatter_fig.show()
-    # scatter_fig.data[0]
 
+# scatter_fig.show()
+# scatter_fig.data[0]
+if __name__ == "__main__":
+    app.run(debug=True)
     print("Done")
