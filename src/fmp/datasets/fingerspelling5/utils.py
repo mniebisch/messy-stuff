@@ -46,6 +46,8 @@ class HandNodes:
     # mcp => kinda knuckle
     wrist: int = 0
     index_mcp: int = 5
+    middle_mcp: int = 9
+    ring_mcp: int = 13
     pinky_mcp: int = 17
 
 
