@@ -249,7 +249,7 @@ def create_3d_scatter(letter_id: str, person_id: str, frame_id: str):
         color_discrete_sequence=px.colors.qualitative.Dark24,
         hover_data="frame_id",
     )
-    hand_data = scatter_data.loc[scatter_data["frame_id"] == frame_id]
+    hand_data = scatter_data.loc[scatter_data["frame_id"] == frame_id].reset_index()
     hand_fig = px.scatter_3d(
         hand_data,
         x="x",
@@ -281,6 +281,21 @@ def create_3d_scatter(letter_id: str, person_id: str, frame_id: str):
                 name="Connection",
             )
         )
+
+    nodes = fingerspelling5.utils.mediapipe_hand_landmarks.nodes
+    nodes_indices = [
+        nodes.wrist,
+        nodes.index_mcp,
+        nodes.middle_mcp,
+        nodes.ring_mcp,
+        nodes.pinky_mcp,
+    ]
+    nodes_indices = [str(node) for node in nodes_indices]
+    mcp_data = hand_data.loc[hand_data["landmark_id"].isin(nodes_indices)]
+    palm_fig = go.Mesh3d(
+        x=mcp_data["x"], y=mcp_data["y"], z=mcp_data["z"], color="black", opacity=0.1
+    )
+    scatter_fig.add_trace(palm_fig)
 
     camera = dict(
         up=dict(x=0, y=-1, z=0),
