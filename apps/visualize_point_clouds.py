@@ -1,5 +1,6 @@
 import collections
 import pathlib
+from typing import DefaultDict, Dict, List
 
 from dash import Dash, Input, Output, dcc, html
 import plotly.graph_objects as go
@@ -197,7 +198,7 @@ vis_data = pd.read_csv(vis_dir / filename, dtype={"landmark_id": str})
 persons = sorted(vis_data["person"].unique().tolist())
 letters = fingerspelling5.utils.fingerspelling5.letters
 
-frame_ids = collections.defaultdict(dict)
+frame_ids: DefaultDict[str, Dict[str, List[int]]] = collections.defaultdict(dict)
 for person in persons:
     for letter in letters:
         df = vis_data.loc[
@@ -235,6 +236,13 @@ def update_frame_ids(person_id, letter_id):
     Input("frame_id", "value"),
 )
 def create_3d_scatter(letter_id: str, person_id: str, frame_id: str):
+    landmark_color_map = {
+        str(landmark_index): color
+        for landmark_index, color in zip(
+            fingerspelling5.utils.mediapipe_hand_landmarks.parts.all,
+            px.colors.qualitative.Dark24,
+        )
+    }
     scatter_data = vis_data.loc[
         (vis_data["person"] == person_id) & (vis_data["letter"] == letter_id)
     ]
@@ -246,56 +254,16 @@ def create_3d_scatter(letter_id: str, person_id: str, frame_id: str):
         color="landmark_id",
         symbol="person",
         opacity=0.25,
-        color_discrete_sequence=px.colors.qualitative.Dark24,
+        color_discrete_map=landmark_color_map,
         hover_data="frame_id",
     )
     hand_data = scatter_data.loc[scatter_data["frame_id"] == frame_id].reset_index()
-    hand_fig = px.scatter_3d(
-        hand_data,
-        x="x",
-        y="y",
-        z="z",
-        color="landmark_id",
-        symbol="person",
-        color_discrete_sequence=px.colors.qualitative.Dark24,
-        hover_data="frame_id",
+    add_hand_to_figure(scatter_fig, hand_data, "violet", "square", landmark_color_map)
+
+    median_hand = (
+        scatter_data.groupby("landmark_id")[["x", "y", "z"]].median().reset_index()
     )
-    scatter_fig.add_traces(hand_fig.data)
-
-    for connection in connections:
-        node_a_id, node_b_id = connection
-        # assumption: "row" only contains one element
-        node_a_row = hand_data.loc[hand_data["landmark_id"] == str(node_a_id)]
-        node_b_row = hand_data.loc[hand_data["landmark_id"] == str(node_b_id)]
-        x_vals = [node_a_row["x"].values[0], node_b_row["x"].values[0]]
-        y_vals = [node_a_row["y"].values[0], node_b_row["y"].values[0]]
-        z_vals = [node_a_row["z"].values[0], node_b_row["z"].values[0]]
-
-        scatter_fig.add_trace(
-            go.Scatter3d(
-                x=x_vals,
-                y=y_vals,
-                z=z_vals,
-                mode="lines",
-                line=dict(color="black"),
-                name="Connection",
-            )
-        )
-
-    nodes = fingerspelling5.utils.mediapipe_hand_landmarks.nodes
-    nodes_indices = [
-        nodes.wrist,
-        nodes.index_mcp,
-        nodes.middle_mcp,
-        nodes.ring_mcp,
-        nodes.pinky_mcp,
-    ]
-    nodes_indices = [str(node) for node in nodes_indices]
-    mcp_data = hand_data.loc[hand_data["landmark_id"].isin(nodes_indices)]
-    palm_fig = go.Mesh3d(
-        x=mcp_data["x"], y=mcp_data["y"], z=mcp_data["z"], color="black", opacity=0.1
-    )
-    scatter_fig.add_trace(palm_fig)
+    add_hand_to_figure(scatter_fig, median_hand, "grey", "diamond", landmark_color_map)
 
     camera = dict(
         up=dict(x=0, y=-1, z=0),
@@ -305,6 +273,65 @@ def create_3d_scatter(letter_id: str, person_id: str, frame_id: str):
     scatter_fig.update_layout(scene_camera=camera)
 
     return scatter_fig
+
+
+def add_hand_to_figure(
+    fig: go.Figure,
+    hand: pd.DataFrame,
+    color: str,
+    symbol: str,
+    landmark_color_map: Dict[str, str],
+) -> None:
+    # add landmarks nodes
+    hover_data = "frame_id" if "frame_id" in hand.columns else None
+    hand_fig = px.scatter_3d(
+        hand,
+        x="x",
+        y="y",
+        z="z",
+        color="landmark_id",
+        color_discrete_map=landmark_color_map,
+        hover_data=hover_data,
+        symbol_sequence=[symbol],
+    )
+    fig.add_traces(hand_fig.data)
+
+    # add lines betweem landmarks
+    for connection in connections:
+        node_a_id, node_b_id = connection
+        # assumption: "row" only contains one element
+        node_a_row = hand.loc[hand["landmark_id"] == str(node_a_id)]
+        node_b_row = hand.loc[hand["landmark_id"] == str(node_b_id)]
+        x_vals = [node_a_row["x"].values[0], node_b_row["x"].values[0]]
+        y_vals = [node_a_row["y"].values[0], node_b_row["y"].values[0]]
+        z_vals = [node_a_row["z"].values[0], node_b_row["z"].values[0]]
+
+        fig.add_trace(
+            go.Scatter3d(
+                x=x_vals,
+                y=y_vals,
+                z=z_vals,
+                mode="lines",
+                line=dict(color=color),
+                name="Connection",
+            )
+        )
+
+    # add palm
+    nodes = fingerspelling5.utils.mediapipe_hand_landmarks.nodes
+    nodes_indices = [
+        nodes.wrist,
+        nodes.index_mcp,
+        nodes.middle_mcp,
+        nodes.ring_mcp,
+        nodes.pinky_mcp,
+    ]
+    nodes_indices = [str(node) for node in nodes_indices]
+    mcp_data = hand.loc[hand["landmark_id"].isin(nodes_indices)]
+    palm_fig = go.Mesh3d(
+        x=mcp_data["x"], y=mcp_data["y"], z=mcp_data["z"], color=color, opacity=0.1
+    )
+    fig.add_trace(palm_fig)
 
 
 # scatter_fig.show()
