@@ -1,5 +1,5 @@
 import pathlib
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import cv2
 import mediapipe as mp
@@ -61,19 +61,23 @@ def process_dataset(dataset_path: pathlib.Path):
                 continue
             letter = letter_dir.name
 
-            images = [cv2.imread(str(f)) for f in letter_dir.glob("color_*")]
+            # images = [cv2.imread(str(f)) for f in letter_dir.glob("color_*")]
+            # images = [cv2.imread(str(f)) for f in letter_dir.glob("frame_*")] # for self recorded data
             mp_hands = mp.solutions.hands.Hands(
                 static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5
             )
 
-            for image in tqdm.tqdm(images, desc="Images"):
+            file_paths = list(letter_dir.glob("color_*"))
+            for file_path in tqdm.tqdm(file_paths, desc="Images"):
+                image = cv2.imread(str(file_path))
                 image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 results = mp_hands.process(image_rgb)
                 hand_point_cloud = extract_hand_point_cloud(results)
-                column_map = create_column_map(hand_point_cloud)
+                column_map: Dict[str, Any] = create_column_map(hand_point_cloud)
 
                 column_map["person"] = person
                 column_map["letter"] = letter
+                column_map["img_file"] = str(pathlib.Path(*file_path.parts[-4:]))
 
                 data.append(column_map)
 
@@ -83,9 +87,11 @@ def process_dataset(dataset_path: pathlib.Path):
 if __name__ == "__main__":
     data_basepath = pathlib.Path.home() / "data"
     dataset_path = data_basepath / "fingerspelling5"
+    # dataset_path = data_basepath / "recorded" / "asl_alphabet" / "images" # self recorded data
 
     output_path = pathlib.Path(__file__).parent / "data"
-    output_file = output_path / "fingerspelling5_singlehands.csv"
+    output_file = output_path / "fingerspelling5_singlehands_with_filepath.csv"
+    # output_file = output_path / "recorded_asl_alphabet_singlehands.csv"
 
     df = process_dataset(dataset_path=dataset_path)
     df.to_csv(output_file, index=False)
