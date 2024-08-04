@@ -51,12 +51,16 @@ def process_dataset(dataset_path: pathlib.Path):
     data = []
 
     dataset_path = dataset_path
-    for person_dir in tqdm.tqdm(dataset_path.iterdir(), desc="Persons"):
+    for person_dir in tqdm.tqdm(
+        list(dataset_path.iterdir()), desc="Persons", leave=False
+    ):
         if not person_dir.is_dir():
             continue
         person = person_dir.name
 
-        for letter_dir in tqdm.tqdm(person_dir.iterdir(), desc="Letters"):
+        for letter_dir in tqdm.tqdm(
+            list(person_dir.iterdir()), desc="Letters", leave=False
+        ):
             if not letter_dir.is_dir():
                 continue
             letter = letter_dir.name
@@ -68,7 +72,7 @@ def process_dataset(dataset_path: pathlib.Path):
             )
 
             file_paths = list(letter_dir.glob("color_*"))
-            for file_path in tqdm.tqdm(file_paths, desc="Images"):
+            for file_path in tqdm.tqdm(file_paths, desc="Images", leave=False):
                 image = cv2.imread(str(file_path))
                 image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 results = mp_hands.process(image_rgb)
