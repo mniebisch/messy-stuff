@@ -72,6 +72,10 @@ def process_dataset(dataset_path: pathlib.Path):
             )
 
             file_paths = list(letter_dir.glob("color_*"))
+            # sort by filename as video is saved as series of frame images
+            # the landmark extractor uses assumes a series of "smooth" transistions
+            # due to setting 'static_image_mode' to False
+            file_paths = sorted(file_paths)
             for file_path in tqdm.tqdm(file_paths, desc="Images", leave=False):
                 image = cv2.imread(str(file_path))
                 image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -94,7 +98,7 @@ if __name__ == "__main__":
     # dataset_path = data_basepath / "recorded" / "asl_alphabet" / "images" # self recorded data
 
     output_path = pathlib.Path(__file__).parent / "data"
-    output_file = output_path / "fingerspelling5_singlehands_with_filepath.csv"
+    output_file = output_path / "fingerspelling5_singlehands_with_filepath_sorted.csv"
     # output_file = output_path / "recorded_asl_alphabet_singlehands.csv"
 
     df = process_dataset(dataset_path=dataset_path)
