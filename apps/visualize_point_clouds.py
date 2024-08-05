@@ -11,6 +11,7 @@ from torchvision.transforms import v2
 import pandas as pd
 import plotly.express as px
 from sklearn import mixture, neighbors
+from skimage import io
 
 
 from fmp.datasets import fingerspelling5
@@ -40,20 +41,6 @@ connections = [
     (9, 13),
     (13, 17),
 ]
-
-
-def create_hand_dataframe(
-    hand_flat: npt.NDArray, letter: str, person: str, hand_transform, frame_id: int
-) -> pd.DataFrame:
-    hand = hand_transform(hand_flat)
-    hand = pd.DataFrame(hand, columns=["x", "y", "z"])
-    hand["letter"] = letter
-    hand["person"] = person
-    hand["landmark_id"] = [
-        str(i) for i in fingerspelling5.utils.mediapipe_hand_landmarks.parts.all
-    ]
-    hand["frame_id"] = frame_id
-    return hand
 
 
 def create_landmark_volume(
@@ -105,8 +92,9 @@ def create_landmark_volume(
     return volume
 
 
+img_data_dir = pathlib.Path(__file__).parent.parent.parent.parent / "data"
 data_dir = pathlib.Path(__file__).parent.parent / "data" / "fingerspelling5"
-dataset_name = "fingerspelling5_singlehands"
+dataset_name = "fingerspelling5_singlehands_sorted"
 vis_dir = data_dir / dataset_name / "vis_data"
 filename = f"{dataset_name}_vis_data.csv"
 
@@ -194,7 +182,6 @@ vis_data = pd.read_csv(vis_dir / filename, dtype={"landmark_id": str})
 #         )
 #     )
 
-
 persons = sorted(vis_data["person"].unique().tolist())
 letters = fingerspelling5.utils.fingerspelling5.letters
 
@@ -212,7 +199,23 @@ app.layout = html.Div(
         dcc.Dropdown(options=letters, value=letters[0], id="letter_id"),
         dcc.Dropdown(options=persons, value=persons[0], id="person_id"),
         dcc.Dropdown(options=frame_ids[persons[0]], id="frame_id"),
-        dcc.Graph(id="3d_figure", style={"height": "80vh", "width": "95vw"}),
+        html.Div(
+            [
+                html.Div(
+                    dcc.Graph(
+                        id="3d_hand_image", style={"height": "100%", "width": "100%"}
+                    ),
+                    style={"display": "inline-block", "width": "19%", "height": "19%"},
+                ),
+                html.Div(
+                    # dcc.Graph(id="3d_figure", style={"height": "80vh", "width": "95vw"}),
+                    dcc.Graph(
+                        id="3d_figure", style={"height": "100%", "width": "100%"}
+                    ),
+                    style={"display": "inline-block", "width": "79%", "height": "80vh"},
+                ),
+            ]
+        ),
     ]
 )
 
@@ -231,6 +234,7 @@ def update_frame_ids(person_id, letter_id):
 
 @app.callback(
     Output("3d_figure", "figure"),
+    Output("3d_hand_image", "figure"),
     Input("letter_id", "value"),
     Input("person_id", "value"),
     Input("frame_id", "value"),
@@ -259,6 +263,13 @@ def create_3d_scatter(letter_id: str, person_id: str, frame_id: str):
     )
     hand_data = scatter_data.loc[scatter_data["frame_id"] == frame_id].reset_index()
     add_hand_to_figure(scatter_fig, hand_data, "violet", "square", landmark_color_map)
+    img_file = hand_data["img_file"].unique()
+    if len(img_file) != 1:
+        raise ValueError("Only one image should be source for data.")
+    img_file = img_file[0]
+    image_path = img_data_dir.joinpath(pathlib.Path(img_file))
+
+    image_fig = create_2d_hand_image(image_path, hand_data)
 
     median_hand = (
         scatter_data.groupby("landmark_id")[["x", "y", "z"]].median().reset_index()
@@ -272,7 +283,7 @@ def create_3d_scatter(letter_id: str, person_id: str, frame_id: str):
     )
     scatter_fig.update_layout(scene_camera=camera)
 
-    return scatter_fig
+    return scatter_fig, image_fig
 
 
 def add_hand_to_figure(
@@ -332,6 +343,39 @@ def add_hand_to_figure(
         x=mcp_data["x"], y=mcp_data["y"], z=mcp_data["z"], color=color, opacity=0.1
     )
     fig.add_trace(palm_fig)
+
+
+def create_2d_hand_image(
+    image_path: pathlib.Path, hand_landmarks: pd.DataFrame
+) -> go.Figure:
+    image = io.imread(image_path)
+    hand_landmarks = hand_landmarks.copy()
+
+    hand_landmarks.loc[:, "x_raw"] = hand_landmarks.loc[:, "x_raw"] * image.shape[1]
+    hand_landmarks.loc[:, "y_raw"] = hand_landmarks.loc[:, "y_raw"] * image.shape[0]
+
+    img_fig = px.imshow(image)
+    fig_hand = px.scatter(hand_landmarks, x="x_raw", y="y_raw")
+    img_fig.add_traces(fig_hand.data)
+
+    for connection in connections:
+        node_a_id, node_b_id = connection
+        # assumption: "row" only contains one element
+        node_a_row = hand_landmarks.loc[hand_landmarks["landmark_id"] == str(node_a_id)]
+        node_b_row = hand_landmarks.loc[hand_landmarks["landmark_id"] == str(node_b_id)]
+        x_vals = [node_a_row["x_raw"].values[0], node_b_row["x_raw"].values[0]]
+        y_vals = [node_a_row["y_raw"].values[0], node_b_row["y_raw"].values[0]]
+        img_fig.add_trace(
+            go.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode="lines",
+                line=dict(color="yellow"),
+                showlegend=False,
+            )
+        )
+
+    return img_fig
 
 
 # scatter_fig.show()
