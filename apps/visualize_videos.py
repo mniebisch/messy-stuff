@@ -3,10 +3,10 @@ import pathlib
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from skimage import io
-
 from matplotlib.colors import Normalize
+
+from fmp.datasets import fingerspelling5
 
 
 def draw_hand(canvas, landmarks):
@@ -108,32 +108,29 @@ img_data_dir = pathlib.Path(__file__).parent.parent.parent.parent / "data"
 data_dir = pathlib.Path(__file__).parent.parent / "data" / "fingerspelling5"
 
 dataset_name = "fingerspelling5_singlehands_sorted"
-vis_dir = data_dir / dataset_name / "vis_data"
-filename = f"{dataset_name}_vis_data.csv"
-
-vis_data = pd.read_csv(vis_dir / filename, dtype={"landmark_id": str})
 
 # data interface
 example_person = "D"
 example_letter = "r"
 
-example_selection = vis_data.loc[
-    (vis_data["person"] == example_person) & (vis_data["letter"] == example_letter)
+other_data_file = data_dir / dataset_name / f"{dataset_name}.csv"
+other_data = fingerspelling5.utils.read_csv(other_data_file, filter_nans=True)
+other_selection = other_data.loc[
+    (other_data["person"] == example_person) & (other_data["letter"] == example_letter)
 ]
+data_columns = fingerspelling5.utils.generate_hand_landmark_columns()
+raw_data = other_selection.loc[:, data_columns].values
+# TODO dangerous path!!! stacked variant vs single row variant are kinda duplicats
+raw_values_stacked = raw_data.reshape(
+    -1,
+    fingerspelling5.utils.mediapipe_hand_landmarks.num_nodes,
+    len(fingerspelling5.utils.mediapipe_hand_landmarks.spatial_coords),
+)
+example_files = other_selection["img_file"]
 
-example_files = sorted(example_selection["img_file"].unique().tolist())
-
-# start loop here
 frames = []
-for example_file in example_files:
-    example_data = example_selection.loc[example_selection["img_file"] == example_file]
-    example_values = example_data.loc[:, ["x_raw", "y_raw", "z_raw"]].values
-
-    img_file = example_data["img_file"].unique()
-    if len(img_file) != 1:
-        raise ValueError("Only one image should be source for data.")
-    img_file = img_file[0]
-    image_path = img_data_dir.joinpath(pathlib.Path(img_file))
+for example_file, example_values in zip(example_files, raw_values_stacked):
+    image_path = img_data_dir.joinpath(pathlib.Path(example_file))
     img = io.imread(image_path)
     frames.append((img, example_values))
 
@@ -175,3 +172,12 @@ while True:
 
 
 print("Done")
+
+
+# TODO add hotkeys for image is "bad" -> should be written to csv or similar
+# TODO if "bad" labeling available show as text somewhere?
+
+# TODO argparse/click/jsonargparse for command line handling
+# TODO add creation of csv file to log 'quality' if not existent
+# TODO add 'quality' and 'view' information to csv, 'quality' via keystroke, and 'view' automatically
+# TODO add vis of 'quality' in vid
