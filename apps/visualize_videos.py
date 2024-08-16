@@ -1,4 +1,5 @@
 import pathlib
+from typing import Tuple
 
 import click
 import cv2
@@ -9,6 +10,32 @@ from matplotlib.colors import Normalize
 
 from fmp.datasets import fingerspelling5
 
+
+def map_line_color(node_a: int, node_b: int) -> Tuple[int, int, int]:
+    hand_parts  = fingerspelling5.utils.mediapipe_hand_landmarks.parts.__dict__
+    node_mapping =  [(part, node_index) for part, node_indices in  hand_parts.items() for node_index in node_indices]
+    node_sorted = sorted(node_mapping, key=lambda x: x[1])
+    node_lookup = [part for part, _ in node_sorted if part != "all" and part != "palm"]
+
+    node_a_part = node_lookup[node_a]
+    node_b_part = node_lookup[node_b]
+
+    is_nodes_equal = node_a_part == node_b_part
+    is_nodes_palm = node_a_part == "palm" or node_b_part == "palm"
+
+    if is_nodes_equal and not is_nodes_palm:
+        color_mapping = {
+            "thumb": (26, 255, 26), 
+            "index_finger": (0, 97, 230),
+            "middle_finger": (89, 17, 212), 
+            "ring_finger": (209, 108, 0), 
+            "pinky": (0, 79, 153),
+        }
+        line_color = color_mapping[node_a_part]
+    else:
+        line_color = (0, 255, 255)
+
+    return line_color
 
 def draw_hand(canvas, landmarks, mult: int):
     height, width, _ = canvas.shape
@@ -56,12 +83,13 @@ def draw_hand(canvas, landmarks, mult: int):
     for edge in edges:
         x1, y1 = landmarks[edge[0], :2]
         x2, y2 = landmarks[edge[1], :2]
+        line_color = map_line_color(node_a=edge[0], node_b=edge[1])
         cv2.line(
             canvas,
             (int(x1 * width), int(y1 * height)),
             (int(x2 * width), int(y2 * height)),
-            (0, 255, 255),
-            1,
+            line_color,
+            2,
         )
 
         num_interpolation = 0
