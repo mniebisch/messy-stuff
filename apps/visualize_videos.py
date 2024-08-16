@@ -10,9 +10,8 @@ from matplotlib.colors import Normalize
 from fmp.datasets import fingerspelling5
 
 
-def draw_hand(canvas, landmarks):
+def draw_hand(canvas, landmarks, mult: int):
     height, width, _ = canvas.shape
-    mult = 5
     canvas = cv2.resize(
         canvas, (mult * width, mult * height), interpolation=cv2.INTER_LINEAR
     )
@@ -123,12 +122,14 @@ def draw_hand(canvas, landmarks):
 @click.option("--dataset-name", required=True, type=str)
 @click.option("--person", required=True, type=str)
 @click.option("--letter", required=True, type=str)
+@click.option("--image-resize-factor", type=int, default=1)
 def main(
     img_data_dir: pathlib.Path,
     dataset_dir: pathlib.Path,
     dataset_name: str,
     person: str,
     letter: str,
+    image_resize_factor: int,
 ):
     """
     ```
@@ -173,7 +174,7 @@ def main(
         global current_frame
         current_frame = val
         img, values = frames[val]
-        img = draw_hand(img, values)
+        img = draw_hand(img, values, image_resize_factor)
 
         cv2.imshow("blub", img)
 
