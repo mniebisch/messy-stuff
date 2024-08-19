@@ -39,17 +39,26 @@ def map_line_color(node_a: int, node_b: int) -> Tuple[int, int, int]:
 
     return line_color
 
-def add_img_label_text_canvas(canvas: npt.NDArray, img_label: bool) -> npt.NDArray:
+def add_img_label_text_canvas(canvas: npt.NDArray, img_label: bool, views: int) -> npt.NDArray:
     canvas_width = canvas.shape[1]
-    text_canvas = np.ones((50, canvas_width, 3), dtype=np.uint8) * 255
+    text_canvas = np.ones((70, canvas_width, 3), dtype=np.uint8) * 255
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 0.6
     font_color = (0, 255, 0) if not img_label else (0, 0, 255)
     font_size = 1
     cv2.putText(
         text_canvas,
-        f"img anomaly: {img_label}",
+        f"img views: {views}",
         (10, 25),
+        font,
+        font_scale,
+        font_color,
+        font_size,
+    )
+    cv2.putText(
+        text_canvas,
+        f"img anomaly: {img_label}",
+        (10, 50),
         font,
         font_scale,
         font_color,
@@ -57,7 +66,7 @@ def add_img_label_text_canvas(canvas: npt.NDArray, img_label: bool) -> npt.NDArr
     )
     return np.concatenate([text_canvas, canvas], axis=0)
 
-def draw_hand(canvas, landmarks, mult: int, hand_label: bool):
+def draw_hand(canvas, landmarks, mult: int, hand_label: bool, num_views: int):
     height, width, _ = canvas.shape
     canvas = cv2.resize(
         canvas, (mult * width, mult * height), interpolation=cv2.INTER_LINEAR
@@ -150,7 +159,7 @@ def draw_hand(canvas, landmarks, mult: int, hand_label: bool):
                 -1,
             )
 
-    canvas = add_img_label_text_canvas(canvas, hand_label)
+    canvas = add_img_label_text_canvas(canvas, hand_label, num_views)
     return canvas
 
 
@@ -204,11 +213,13 @@ def main(
 
     label_file = data_dir / dataset_name / f"{dataset_name}__data_quality.csv"
     quality_col = "is_corrupted"
+    view_num_col = "views"
     if label_file.is_file():
         img_quality = pd.read_csv(label_file)
     else:
         img_quality = other_data.loc[:, ["person", "letter", "img_file"]].copy()
         img_quality[quality_col] = False
+        img_quality[view_num_col] = 0
 
     other_selection = other_data.loc[selection_indices]
     data_columns = fingerspelling5.utils.generate_hand_landmark_columns()
@@ -234,8 +245,9 @@ def main(
 
     # use dataclas instead?
     callback_data = {
-        "current_frame": 0,
-        "frame_img_labels": img_quality.loc[selection_indices, "is_corrupted"].values
+        "current_frame": 0, # temporary fix as trackbar somehow ignores first value
+        "frame_img_labels": img_quality.loc[selection_indices, quality_col].values,
+        "frame_views": img_quality.loc[selection_indices, view_num_col].values
     }
 
     def on_trackbar(val):
@@ -243,20 +255,22 @@ def main(
         callback_data["current_frame"] = val
         img, values = frames[val]
         img = draw_hand(
-            img, 
+            img,    
             values, 
             image_resize_factor, 
             callback_data["frame_img_labels"][callback_data["current_frame"]],
+            callback_data["frame_views"][callback_data["current_frame"]],
         )
+        callback_data["frame_views"][val] = callback_data["frame_views"][val] + 1
 
         cv2.imshow("landmarks", img)
 
     cv2.createTrackbar("frame", "slider", 0, len(frames) - 1, on_trackbar)
 
+    on_trackbar(callback_data["current_frame"])
     playing = False
     while True:
         if playing:
-
             cv2.setTrackbarPos("frame", "slider", callback_data["current_frame"])
             callback_data["current_frame"] += 1
 
@@ -278,13 +292,9 @@ def main(
             on_trackbar(callback_data["current_frame"])
 
     img_quality.loc[selection_indices, quality_col] = callback_data["frame_img_labels"]
+    img_quality.loc[selection_indices, view_num_col] = callback_data["frame_views"]
     img_quality.to_csv(label_file, index=False)
     print("Done")
-
-    # TODO add creation of csv file to log 'quality' if not existent
-    # TODO add 'quality' and 'view' information to csv, 'quality' via keystroke, and 'view' automatically
-    # TODO add vis of 'quality' in vid
-
 
 if __name__ == "__main__":
     main()
