@@ -5,6 +5,7 @@ import click
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy import typing as npt
 from skimage import io
 from matplotlib.colors import Normalize
 
@@ -37,7 +38,25 @@ def map_line_color(node_a: int, node_b: int) -> Tuple[int, int, int]:
 
     return line_color
 
-def draw_hand(canvas, landmarks, mult: int):
+def add_img_label_text_canvas(canvas: npt.NDArray, img_label: bool) -> npt.NDArray:
+    canvas_width = canvas.shape[1]
+    text_canvas = np.ones((50, canvas_width, 3), dtype=np.uint8) * 255
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.6
+    font_color = (0, 255, 0) if not img_label else (0, 0, 255)
+    font_size = 1
+    cv2.putText(
+        text_canvas,
+        f"img anomaly: {img_label}",
+        (10, 25),
+        font,
+        font_scale,
+        font_color,
+        font_size,
+    )
+    return np.concatenate([text_canvas, canvas], axis=0)
+
+def draw_hand(canvas, landmarks, mult: int, hand_label: bool):
     height, width, _ = canvas.shape
     canvas = cv2.resize(
         canvas, (mult * width, mult * height), interpolation=cv2.INTER_LINEAR
@@ -129,6 +148,8 @@ def draw_hand(canvas, landmarks, mult: int):
                 (int(color_bgr[0]), int(color_bgr[1]), int(color_bgr[2])),
                 -1,
             )
+
+    canvas = add_img_label_text_canvas(canvas, hand_label)
     return canvas
 
 
@@ -200,13 +221,22 @@ def main(
     # TODO at the moment window position is magic number
     cv2.moveWindow("slider", 600, 0)
 
-    callback_data = {"current_frame": 0}
+    # use dataclas instead?
+    callback_data = {
+        "current_frame": 0,
+        "frame_img_labels": np.zeros(len(frames), dtype=bool)
+    }
 
     def on_trackbar(val):
         # global current_frame
         callback_data["current_frame"] = val
         img, values = frames[val]
-        img = draw_hand(img, values, image_resize_factor)
+        img = draw_hand(
+            img, 
+            values, 
+            image_resize_factor, 
+            callback_data["frame_img_labels"][callback_data["current_frame"]],
+        )
 
         cv2.imshow("landmarks", img)
 
@@ -230,6 +260,11 @@ def main(
             playing = True
         elif key == ord("q"):
             break
+        elif key == ord("x"):
+            current_frame = callback_data["current_frame"]
+            frame_label = callback_data["frame_img_labels"][current_frame]
+            callback_data["frame_img_labels"][current_frame] = not frame_label
+            on_trackbar(callback_data["current_frame"])
 
     print("Done")
 
