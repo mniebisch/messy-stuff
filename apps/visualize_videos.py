@@ -8,6 +8,7 @@ import numpy as np
 from numpy import typing as npt
 from skimage import io
 from matplotlib.colors import Normalize
+import pandas as pd
 
 from fmp.datasets import fingerspelling5
 
@@ -196,10 +197,20 @@ def main(
 
     other_data_file = data_dir / dataset_name / f"{dataset_name}.csv"
     other_data = fingerspelling5.utils.read_csv(other_data_file, filter_nans=True)
-    other_selection = other_data.loc[
+    selection_indices = (
         (other_data["person"] == example_person)
         & (other_data["letter"] == example_letter)
-    ]
+    )
+
+    label_file = data_dir / dataset_name / f"{dataset_name}__data_quality.csv"
+    quality_col = "is_corrupted"
+    if label_file.is_file():
+        img_quality = pd.read_csv(label_file)
+    else:
+        img_quality = other_data.loc[:, ["person", "letter", "img_file"]].copy()
+        img_quality[quality_col] = False
+
+    other_selection = other_data.loc[selection_indices]
     data_columns = fingerspelling5.utils.generate_hand_landmark_columns()
     raw_data = other_selection.loc[:, data_columns].values
     # TODO dangerous path!!! stacked variant vs single row variant are kinda duplicats
@@ -224,7 +235,7 @@ def main(
     # use dataclas instead?
     callback_data = {
         "current_frame": 0,
-        "frame_img_labels": np.zeros(len(frames), dtype=bool)
+        "frame_img_labels": img_quality.loc[selection_indices, "is_corrupted"].values
     }
 
     def on_trackbar(val):
@@ -266,10 +277,9 @@ def main(
             callback_data["frame_img_labels"][current_frame] = not frame_label
             on_trackbar(callback_data["current_frame"])
 
+    img_quality.loc[selection_indices, quality_col] = callback_data["frame_img_labels"]
+    img_quality.to_csv(label_file, index=False)
     print("Done")
-
-    # TODO add hotkeys for image is "bad" -> should be written to csv or similar
-    # TODO if "bad" labeling available show as text somewhere?
 
     # TODO add creation of csv file to log 'quality' if not existent
     # TODO add 'quality' and 'view' information to csv, 'quality' via keystroke, and 'view' automatically
