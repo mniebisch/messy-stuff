@@ -196,28 +196,31 @@ def main(
         frames.append((img, example_values))
 
     # create cv2 window
-    cv2.namedWindow("muh")
+    cv2.namedWindow("slider")
+    # TODO at the moment window position is magic number
+    cv2.moveWindow("slider", 600, 0)
+
+    callback_data = {"current_frame": 0}
 
     def on_trackbar(val):
-        global current_frame
-        current_frame = val
+        # global current_frame
+        callback_data["current_frame"] = val
         img, values = frames[val]
         img = draw_hand(img, values, image_resize_factor)
 
-        cv2.imshow("blub", img)
+        cv2.imshow("landmarks", img)
 
-    cv2.createTrackbar("oi", "muh", 0, len(frames) - 1, on_trackbar)
+    cv2.createTrackbar("frame", "slider", 0, len(frames) - 1, on_trackbar)
 
     playing = False
-    current_frame = 0
     while True:
         if playing:
 
-            cv2.setTrackbarPos("oi", "muh", current_frame)
-            current_frame += 1
+            cv2.setTrackbarPos("frame", "slider", callback_data["current_frame"])
+            callback_data["current_frame"] += 1
 
-            if current_frame > len(frames):
-                current_frame = 0
+            if callback_data["current_frame"] > len(frames):
+                callback_data["current_frame"] = 0
 
         key = cv2.waitKey(150)
 
