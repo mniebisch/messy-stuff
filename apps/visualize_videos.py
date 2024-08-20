@@ -14,8 +14,12 @@ from fmp.datasets import fingerspelling5
 
 
 def map_line_color(node_a: int, node_b: int) -> Tuple[int, int, int]:
-    hand_parts  = fingerspelling5.utils.mediapipe_hand_landmarks.parts.__dict__
-    node_mapping =  [(part, node_index) for part, node_indices in  hand_parts.items() for node_index in node_indices]
+    hand_parts = fingerspelling5.utils.mediapipe_hand_landmarks.parts.__dict__
+    node_mapping = [
+        (part, node_index)
+        for part, node_indices in hand_parts.items()
+        for node_index in node_indices
+    ]
     node_sorted = sorted(node_mapping, key=lambda x: x[1])
     node_lookup = [part for part, _ in node_sorted if part != "all" and part != "palm"]
 
@@ -27,10 +31,10 @@ def map_line_color(node_a: int, node_b: int) -> Tuple[int, int, int]:
 
     if is_nodes_equal and not is_nodes_palm:
         color_mapping = {
-            "thumb": (26, 255, 26), 
+            "thumb": (26, 255, 26),
             "index_finger": (0, 97, 230),
-            "middle_finger": (89, 17, 212), 
-            "ring_finger": (209, 108, 0), 
+            "middle_finger": (89, 17, 212),
+            "ring_finger": (209, 108, 0),
             "pinky": (0, 79, 153),
         }
         line_color = color_mapping[node_a_part]
@@ -39,7 +43,10 @@ def map_line_color(node_a: int, node_b: int) -> Tuple[int, int, int]:
 
     return line_color
 
-def add_img_label_text_canvas(canvas: npt.NDArray, img_label: bool, views: int) -> npt.NDArray:
+
+def add_img_label_text_canvas(
+    canvas: npt.NDArray, img_label: bool, views: int
+) -> npt.NDArray:
     canvas_width = canvas.shape[1]
     text_canvas = np.ones((70, canvas_width, 3), dtype=np.uint8) * 255
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -65,6 +72,7 @@ def add_img_label_text_canvas(canvas: npt.NDArray, img_label: bool, views: int) 
         font_size,
     )
     return np.concatenate([text_canvas, canvas], axis=0)
+
 
 def draw_hand(canvas, landmarks, mult: int, hand_label: bool, num_views: int):
     height, width, _ = canvas.shape
@@ -206,9 +214,8 @@ def main(
 
     other_data_file = data_dir / dataset_name / f"{dataset_name}.csv"
     other_data = fingerspelling5.utils.read_csv(other_data_file, filter_nans=True)
-    selection_indices = (
-        (other_data["person"] == example_person)
-        & (other_data["letter"] == example_letter)
+    selection_indices = (other_data["person"] == example_person) & (
+        other_data["letter"] == example_letter
     )
 
     label_file = data_dir / dataset_name / f"{dataset_name}__data_quality.csv"
@@ -245,9 +252,9 @@ def main(
 
     # use dataclas instead?
     callback_data = {
-        "current_frame": 0, # temporary fix as trackbar somehow ignores first value
+        "current_frame": 0,  # temporary fix as trackbar somehow ignores first value
         "frame_img_labels": img_quality.loc[selection_indices, quality_col].values,
-        "frame_views": img_quality.loc[selection_indices, view_num_col].values
+        "frame_views": img_quality.loc[selection_indices, view_num_col].values,
     }
 
     def on_trackbar(val):
@@ -255,9 +262,9 @@ def main(
         callback_data["current_frame"] = val
         img, values = frames[val]
         img = draw_hand(
-            img,    
-            values, 
-            image_resize_factor, 
+            img,
+            values,
+            image_resize_factor,
             callback_data["frame_img_labels"][callback_data["current_frame"]],
             callback_data["frame_views"][callback_data["current_frame"]],
         )
@@ -295,6 +302,7 @@ def main(
     img_quality.loc[selection_indices, view_num_col] = callback_data["frame_views"]
     img_quality.to_csv(label_file, index=False)
     print("Done")
+
 
 if __name__ == "__main__":
     main()
