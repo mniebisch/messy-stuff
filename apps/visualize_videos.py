@@ -1,18 +1,73 @@
 import pathlib
+from typing import Tuple
 
 import click
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy import typing as npt
 from skimage import io
 from matplotlib.colors import Normalize
+import pandas as pd
 
 from fmp.datasets import fingerspelling5
 
 
-def draw_hand(canvas, landmarks):
+def map_line_color(node_a: int, node_b: int) -> Tuple[int, int, int]:
+    hand_parts  = fingerspelling5.utils.mediapipe_hand_landmarks.parts.__dict__
+    node_mapping =  [(part, node_index) for part, node_indices in  hand_parts.items() for node_index in node_indices]
+    node_sorted = sorted(node_mapping, key=lambda x: x[1])
+    node_lookup = [part for part, _ in node_sorted if part != "all" and part != "palm"]
+
+    node_a_part = node_lookup[node_a]
+    node_b_part = node_lookup[node_b]
+
+    is_nodes_equal = node_a_part == node_b_part
+    is_nodes_palm = node_a_part == "palm" or node_b_part == "palm"
+
+    if is_nodes_equal and not is_nodes_palm:
+        color_mapping = {
+            "thumb": (26, 255, 26), 
+            "index_finger": (0, 97, 230),
+            "middle_finger": (89, 17, 212), 
+            "ring_finger": (209, 108, 0), 
+            "pinky": (0, 79, 153),
+        }
+        line_color = color_mapping[node_a_part]
+    else:
+        line_color = (0, 255, 255)
+
+    return line_color
+
+def add_img_label_text_canvas(canvas: npt.NDArray, img_label: bool, views: int) -> npt.NDArray:
+    canvas_width = canvas.shape[1]
+    text_canvas = np.ones((70, canvas_width, 3), dtype=np.uint8) * 255
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.6
+    font_color = (0, 255, 0) if not img_label else (0, 0, 255)
+    font_size = 1
+    cv2.putText(
+        text_canvas,
+        f"img views: {views}",
+        (10, 25),
+        font,
+        font_scale,
+        font_color,
+        font_size,
+    )
+    cv2.putText(
+        text_canvas,
+        f"img anomaly: {img_label}",
+        (10, 50),
+        font,
+        font_scale,
+        font_color,
+        font_size,
+    )
+    return np.concatenate([text_canvas, canvas], axis=0)
+
+def draw_hand(canvas, landmarks, mult: int, hand_label: bool, num_views: int):
     height, width, _ = canvas.shape
-    mult = 5
     canvas = cv2.resize(
         canvas, (mult * width, mult * height), interpolation=cv2.INTER_LINEAR
     )
@@ -57,12 +112,13 @@ def draw_hand(canvas, landmarks):
     for edge in edges:
         x1, y1 = landmarks[edge[0], :2]
         x2, y2 = landmarks[edge[1], :2]
+        line_color = map_line_color(node_a=edge[0], node_b=edge[1])
         cv2.line(
             canvas,
             (int(x1 * width), int(y1 * height)),
             (int(x2 * width), int(y2 * height)),
-            (0, 255, 255),
-            1,
+            line_color,
+            2,
         )
 
         num_interpolation = 0
@@ -102,6 +158,8 @@ def draw_hand(canvas, landmarks):
                 (int(color_bgr[0]), int(color_bgr[1]), int(color_bgr[2])),
                 -1,
             )
+
+    canvas = add_img_label_text_canvas(canvas, hand_label, num_views)
     return canvas
 
 
@@ -123,12 +181,14 @@ def draw_hand(canvas, landmarks):
 @click.option("--dataset-name", required=True, type=str)
 @click.option("--person", required=True, type=str)
 @click.option("--letter", required=True, type=str)
+@click.option("--image-resize-factor", type=int, default=1)
 def main(
     img_data_dir: pathlib.Path,
     dataset_dir: pathlib.Path,
     dataset_name: str,
     person: str,
     letter: str,
+    image_resize_factor: int,
 ):
     """
     ```
@@ -146,10 +206,22 @@ def main(
 
     other_data_file = data_dir / dataset_name / f"{dataset_name}.csv"
     other_data = fingerspelling5.utils.read_csv(other_data_file, filter_nans=True)
-    other_selection = other_data.loc[
+    selection_indices = (
         (other_data["person"] == example_person)
         & (other_data["letter"] == example_letter)
-    ]
+    )
+
+    label_file = data_dir / dataset_name / f"{dataset_name}__data_quality.csv"
+    quality_col = "is_corrupted"
+    view_num_col = "views"
+    if label_file.is_file():
+        img_quality = pd.read_csv(label_file)
+    else:
+        img_quality = other_data.loc[:, ["person", "letter", "img_file"]].copy()
+        img_quality[quality_col] = False
+        img_quality[view_num_col] = 0
+
+    other_selection = other_data.loc[selection_indices]
     data_columns = fingerspelling5.utils.generate_hand_landmark_columns()
     raw_data = other_selection.loc[:, data_columns].values
     # TODO dangerous path!!! stacked variant vs single row variant are kinda duplicats
@@ -167,28 +239,43 @@ def main(
         frames.append((img, example_values))
 
     # create cv2 window
-    cv2.namedWindow("muh")
+    cv2.namedWindow("slider")
+    # TODO at the moment window position is magic number
+    cv2.moveWindow("slider", 600, 0)
+
+    # use dataclas instead?
+    callback_data = {
+        "current_frame": 0, # temporary fix as trackbar somehow ignores first value
+        "frame_img_labels": img_quality.loc[selection_indices, quality_col].values,
+        "frame_views": img_quality.loc[selection_indices, view_num_col].values
+    }
 
     def on_trackbar(val):
-        global current_frame
-        current_frame = val
+        # global current_frame
+        callback_data["current_frame"] = val
         img, values = frames[val]
-        img = draw_hand(img, values)
+        img = draw_hand(
+            img,    
+            values, 
+            image_resize_factor, 
+            callback_data["frame_img_labels"][callback_data["current_frame"]],
+            callback_data["frame_views"][callback_data["current_frame"]],
+        )
+        callback_data["frame_views"][val] = callback_data["frame_views"][val] + 1
 
-        cv2.imshow("blub", img)
+        cv2.imshow("landmarks", img)
 
-    cv2.createTrackbar("oi", "muh", 0, len(frames) - 1, on_trackbar)
+    cv2.createTrackbar("frame", "slider", 0, len(frames) - 1, on_trackbar)
 
+    on_trackbar(callback_data["current_frame"])
     playing = False
-    current_frame = 0
     while True:
         if playing:
+            cv2.setTrackbarPos("frame", "slider", callback_data["current_frame"])
+            callback_data["current_frame"] += 1
 
-            cv2.setTrackbarPos("oi", "muh", current_frame)
-            current_frame += 1
-
-            if current_frame > len(frames):
-                current_frame = 0
+            if callback_data["current_frame"] > len(frames):
+                callback_data["current_frame"] = 0
 
         key = cv2.waitKey(150)
 
@@ -198,16 +285,16 @@ def main(
             playing = True
         elif key == ord("q"):
             break
+        elif key == ord("x"):
+            current_frame = callback_data["current_frame"]
+            frame_label = callback_data["frame_img_labels"][current_frame]
+            callback_data["frame_img_labels"][current_frame] = not frame_label
+            on_trackbar(callback_data["current_frame"])
 
+    img_quality.loc[selection_indices, quality_col] = callback_data["frame_img_labels"]
+    img_quality.loc[selection_indices, view_num_col] = callback_data["frame_views"]
+    img_quality.to_csv(label_file, index=False)
     print("Done")
-
-    # TODO add hotkeys for image is "bad" -> should be written to csv or similar
-    # TODO if "bad" labeling available show as text somewhere?
-
-    # TODO add creation of csv file to log 'quality' if not existent
-    # TODO add 'quality' and 'view' information to csv, 'quality' via keystroke, and 'view' automatically
-    # TODO add vis of 'quality' in vid
-
 
 if __name__ == "__main__":
     main()

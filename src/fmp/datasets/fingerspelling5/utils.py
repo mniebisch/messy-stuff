@@ -39,6 +39,7 @@ class HandParts:
     ring_finger: list[int]
     pinky: list[int]
     palm: list[int]
+    wrist: list[int]
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,7 @@ mediapipe_hand_landmarks = MediaPipeHandLandmarks(
         ring_finger=[13, 14, 15, 16],
         pinky=[17, 18, 19, 20],
         palm=[0, 5, 9, 13, 17],
+        wrist=[0],
     )
 )
 
