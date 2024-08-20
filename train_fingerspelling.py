@@ -31,10 +31,18 @@ class MLPClassifier(nn.Module):
         self.output_layer = nn.Linear(hidden_dim, output_dim)
         self.relu = nn.ReLU()
 
+        dropout_rate = 0.5
+        self.dropout1 = nn.Dropout(dropout_rate)
+        self.dropout2 = nn.Dropout(dropout_rate)
+        self.dropout3 = nn.Dropout(dropout_rate)
+
     def forward(self, x):
         x = self.relu(self.input_layer(x))
+        x = self.dropout1(x)
         x = self.relu(self.hidden_layer1(x))
+        x = self.dropout2(x)
         x = self.relu(self.hidden_layer2(x))
+        x = self.dropout3(x)
         x = self.output_layer(x)
         return x
 
@@ -60,9 +68,11 @@ if __name__ == "__main__":
     wandb.init(project="fingerspelling5")
 
     input_dim = 63
-    hidden_dim = 128
+    hidden_dim = 512
     output_dim = 24
     model = MLPClassifier(input_dim, hidden_dim, output_dim)
+
+    num_epochs = 60
 
     # Move the model to the GPU if available
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -70,12 +80,13 @@ if __name__ == "__main__":
 
     # Define the loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 
     # Define the training dataset and dataloader (modify as per your data)
     data_path = pathlib.Path(__file__).parent / "data"
     fingerspelling_landmark_csv = data_path / "fingerspelling5_singlehands.csv"
-    batch_size = 512
+    batch_size = 128
 
     landmark_data = pd.read_csv(fingerspelling_landmark_csv)
 
@@ -86,7 +97,7 @@ if __name__ == "__main__":
 
     split_log = {"train_index": train_index.tolist(), "valid_index": val_index.tolist()}
 
-    with open("fingerspelling_data_split.json", "w", encoding="utf-8") as f:
+    with open("fingerspelling_data_split.json", "w", encoding="utf- 8") as f:
         json.dump(split_log, f, ensure_ascii=False, indent=4)
 
     train_data = landmark_data.loc[train_index]
@@ -140,7 +151,6 @@ if __name__ == "__main__":
 
     wandb.watch(model, log="all")
 
-    num_epochs = 20
     model.train()
     for epoch in range(num_epochs):
         batch_iterator = tqdm(
@@ -170,9 +180,15 @@ if __name__ == "__main__":
             batch_iterator.set_postfix({"loss": rolling_loss})
         train_acc = eval(model, eval_train_loader, device)
         valid_acc = eval(model, eval_valid_loader, device)
-
-        wandb.log({"train-acc": train_acc, "valid-acc": valid_acc})
-
+        model.train()
+        wandb.log(
+            {
+                "train-acc": train_acc,
+                "valid-acc": valid_acc,
+                "lr": scheduler.get_last_lr()[0],
+            }
+        )
+        scheduler.step()
         print(f"Train acc: {train_acc}, Valid acc: {valid_acc}")
 
     # Save the encoder weights

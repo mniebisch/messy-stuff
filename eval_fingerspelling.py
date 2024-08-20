@@ -13,12 +13,8 @@ from torchvision import transforms
 from tqdm import tqdm
 
 from cam_mediapipe_singlehand import number_to_letter
-from pipeline_fingerspelling5 import (
-    FlattenTriple,
-    ReshapeToTriple,
-    Scale,
-    load_fingerspelling5,
-)
+from pipeline_fingerspelling5 import (FlattenTriple, ReshapeToTriple, Scale,
+                                      load_fingerspelling5)
 
 
 class MLPClassifier(nn.Module):
@@ -66,7 +62,7 @@ def get_nan_letter(df: pd.DataFrame) -> pd.Series:
 
 if __name__ == "__main__":
     input_dim = 63
-    hidden_dim = 128
+    hidden_dim = 512
     output_dim = 24
     model = MLPClassifier(input_dim, hidden_dim, output_dim)
     ckpt_file = "encoder_weights.pth"

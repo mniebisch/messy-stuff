@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     # Create an instance of the encoder model
     input_dim = 63
-    hidden_dim = 128
+    hidden_dim = 512
     output_dim = 24
     model = MLPClassifier(input_dim, hidden_dim, output_dim)
     model.load_state_dict(torch.load(ckpt_path, map_location=torch.device("cpu")))
@@ -132,6 +132,7 @@ if __name__ == "__main__":
         point_cloud = np.nan_to_num(point_cloud)
         # normalization START
         point_cloud = np.reshape(point_cloud, (-1, 3))
+        point_coords_raw = point_cloud
         point_mean = np.mean(point_cloud, axis=-2, keepdims=True)
         point_cloud = point_cloud - point_mean
         point_scale = (1 / np.max(np.abs(point_cloud))) * 0.999999
@@ -230,6 +231,19 @@ if __name__ == "__main__":
             bottom_canvas,
             text,
             (100, 40),
+            font,
+            font_scale,
+            font_color,
+            font_size,
+        )
+
+        wrist = point_coords_raw[0]
+        middle = point_coords[12]
+        text = f"(wrist (z) {wrist[2]}, middle (z) {middle[2]}, middle - wrist {middle[2] - wrist[2]})"
+        cv2.putText(
+            bottom_canvas,
+            text,
+            (100, 60),
             font,
             font_scale,
             font_color,
