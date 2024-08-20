@@ -274,12 +274,12 @@ data_path = root_path / "data" / "fingerspelling5"
 predictions_path = root_path / "predictions"
 predictions_path = predictions_path / "fingerspelling5_mlp"
 
-dataset_name = "fingerspelling5_singlehands"
+dataset_name = "fingerspelling5_singlehands_sorted"
 
 # TODO save hparams for prediction similar to metric computation
 # TODO add dataset name to pred filename? or read from yaml?
 # is going to change the most?
-ckpt_name = "version_4__epoch=17-step=7002"
+ckpt_name = "version_2__epoch=59-step=47520"
 predictions_filename = f"prediction__{dataset_name}__{ckpt_name}.csv"
 # predictions_full_path = predictions_path / "example" / predictions_filename
 predictions_full_path = predictions_path / predictions_filename
@@ -295,7 +295,7 @@ training_datasplit = load_training_datasplit(predictions_hparams)
 training_datasplit = training_datasplit.reset_index(names=["batch_indices"])
 
 # load recorded data
-recorded_dataset_name = "fingerspelling5_singlehands_micha"
+recorded_dataset_name = "fingerspelling5_singlehands_micha_sorted"
 recorded_data = load_dataset(data_path, recorded_dataset_name)
 metrics_recorded = load_metrics(metrics_path, recorded_dataset_name)
 predictions_recorded_filename = f"prediction__{recorded_dataset_name}__{ckpt_name}.csv"
