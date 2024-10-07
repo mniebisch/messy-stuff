@@ -74,7 +74,7 @@ def add_img_label_text_canvas(
     return np.concatenate([text_canvas, canvas], axis=0)
 
 
-def draw_hand(canvas, landmarks, mult: int, hand_label: bool, num_views: int):
+def draw_hand(canvas, landmarks, mult: int):
     height, width, _ = canvas.shape
     canvas = cv2.resize(
         canvas, (mult * width, mult * height), interpolation=cv2.INTER_LINEAR
@@ -170,7 +170,218 @@ def draw_hand(canvas, landmarks, mult: int, hand_label: bool, num_views: int):
                 -1,
             )
 
-    canvas = add_img_label_text_canvas(canvas, hand_label, num_views)
+    return canvas
+
+
+def create_canvas(size: int) -> npt.NDArray:
+    canvas = np.ones((size, size, 3), dtype=np.uint8) * 255
+    return canvas
+
+
+def map_values(val: float, size: int) -> int:
+    if val >= 0:
+        return int(size / 2 + val * size)
+    else:
+        return int(size / 2 - val * size)
+
+
+def draw_hand_xz(canvas, landmarks):
+    height, width, _ = canvas.shape
+    # Landmark indices and edges
+    edges = [
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (0, 5),
+        (5, 6),
+        (6, 7),
+        (7, 8),
+        (0, 9),
+        (9, 10),
+        (10, 11),
+        (11, 12),
+        (0, 13),
+        (13, 14),
+        (14, 15),
+        (15, 16),
+        (0, 17),
+        (17, 18),
+        (18, 19),
+        (19, 20),
+        (0, 5),
+        (0, 9),
+        (0, 13),
+        (0, 17),
+        (5, 9),
+        (9, 13),
+        (13, 17),
+    ]
+    if landmarks.shape != (21, 3):
+        raise ValueError("Landmarks have incorrect shape.")
+    values = landmarks[:, 2]
+    cmin = -0.5  # min(values)
+    cmax = 0.5  # max(values)
+
+    # Function to interpolate points between two landmarks
+    def interpolate_points(p1, p2, num_points):
+        return np.linspace(p1, p2, num_points + 2)  # [1:-1]
+
+    # Draw landmarks and edges
+    for i in range(21):
+        x, y = landmarks[i, [0, 2]]
+        y = map_values(y, height)
+        cv2.putText(
+            canvas,
+            str(i),
+            (int(x * width), y - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 0),
+            1,
+            cv2.LINE_AA,
+        )
+
+    for edge in edges:
+        x1, y1 = landmarks[edge[0], [0, 2]]
+        x2, y2 = landmarks[edge[1], [0, 2]]
+        y1_mapped = map_values(y1, height)
+        y2_mapped = map_values(y2, height)
+
+        line_color = map_line_color(node_a=edge[0], node_b=edge[1])
+        cv2.line(
+            canvas,
+            (int(x1 * width), y1_mapped),
+            (int(x2 * width), y2_mapped),
+            line_color,
+            2,
+        )
+
+        num_interpolation = 0
+        interpolated_x = interpolate_points(x1, x2, num_interpolation)
+        interpolated_y = interpolate_points(y1, y2, num_interpolation)
+        interpolated_values = interpolate_points(
+            values[edge[0]], values[edge[1]], num_interpolation
+        )
+
+        for x, y, value in zip(interpolated_x, interpolated_y, interpolated_values):
+            y_mapped = map_values(y, height)
+            color_value = int(255 * (value - cmin) / (cmax - cmin))
+            color_bgr = (color_value, color_value, color_value)  # BGR format
+            cv2.circle(
+                canvas,
+                (int(x * width), y_mapped),
+                3 + 1,
+                (0, 255, 255),
+                -1,
+            )
+            cv2.circle(
+                canvas,
+                (int(x * width), y_mapped),
+                3,
+                color_bgr,
+                -1,
+            )
+    return canvas
+
+
+def draw_hand_yz(canvas, landmarks):
+    height, width, _ = canvas.shape
+    # Landmark indices and edges
+    edges = [
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (0, 5),
+        (5, 6),
+        (6, 7),
+        (7, 8),
+        (0, 9),
+        (9, 10),
+        (10, 11),
+        (11, 12),
+        (0, 13),
+        (13, 14),
+        (14, 15),
+        (15, 16),
+        (0, 17),
+        (17, 18),
+        (18, 19),
+        (19, 20),
+        (0, 5),
+        (0, 9),
+        (0, 13),
+        (0, 17),
+        (5, 9),
+        (9, 13),
+        (13, 17),
+    ]
+    if landmarks.shape != (21, 3):
+        raise ValueError("Landmarks have incorrect shape.")
+    values = landmarks[:, 2]
+    cmin = -0.5  # min(values)
+    cmax = 0.5  # max(values)
+
+    # Function to interpolate points between two landmarks
+    def interpolate_points(p1, p2, num_points):
+        return np.linspace(p1, p2, num_points + 2)  # [1:-1]
+
+    # Draw landmarks and edges
+    for i in range(21):
+        x, y = landmarks[i, [2, 1]]
+        x = map_values(x, width)
+        cv2.putText(
+            canvas,
+            str(i),
+            (x, int(y * height) - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 0),
+            1,
+            cv2.LINE_AA,
+        )
+
+    for edge in edges:
+        x1, y1 = landmarks[edge[0], [2, 1]]
+        x2, y2 = landmarks[edge[1], [2, 1]]
+        x1_mapped = map_values(x1, width)
+        x2_mapped = map_values(x2, width)
+
+        line_color = map_line_color(node_a=edge[0], node_b=edge[1])
+        cv2.line(
+            canvas,
+            (x1_mapped, int(y1 * height)),
+            (x2_mapped, int(y2 * height)),
+            line_color,
+            2,
+        )
+
+        num_interpolation = 0
+        interpolated_x = interpolate_points(x1, x2, num_interpolation)
+        interpolated_y = interpolate_points(y1, y2, num_interpolation)
+        interpolated_values = interpolate_points(
+            values[edge[0]], values[edge[1]], num_interpolation
+        )
+
+        for x, y, value in zip(interpolated_x, interpolated_y, interpolated_values):
+            x_mapped = map_values(x, width)
+            color_value = int(255 * (value - cmin) / (cmax - cmin))
+            color_bgr = (color_value, color_value, color_value)  # BGR format
+            cv2.circle(
+                canvas,
+                (x_mapped, int(y * height)),
+                3 + 1,
+                (0, 255, 255),
+                -1,
+            )
+            cv2.circle(
+                canvas,
+                (x_mapped, int(y * height)),
+                3,
+                color_bgr,
+                -1,
+            )
     return canvas
 
 
@@ -268,10 +479,20 @@ def main(
             img,
             values,
             image_resize_factor,
-            callback_data["frame_img_labels"][callback_data["current_frame"]],
-            callback_data["frame_views"][callback_data["current_frame"]],
         )
         callback_data["frame_views"][val] = callback_data["frame_views"][val] + 1
+
+        canvas_xz = create_canvas(img.shape[0])
+        canvas_yz = create_canvas(img.shape[0])
+
+        canvas_xz = draw_hand_xz(canvas_xz, values)
+        canvas_yz = draw_hand_yz(canvas_yz, values)
+
+        img = np.concatenate([canvas_xz, img, canvas_yz], axis=1)
+
+        hand_label = callback_data["frame_img_labels"][callback_data["current_frame"]]
+        num_views = callback_data["frame_views"][callback_data["current_frame"]]
+        img = add_img_label_text_canvas(img, hand_label, num_views)
 
         cv2.imshow("landmarks", img)
 
