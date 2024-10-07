@@ -141,8 +141,11 @@ def draw_hand(canvas, landmarks, mult: int, hand_label: bool, num_views: int):
             viridis_colormap = plt.get_cmap("bwr")
 
             # Set the minimum and maximum values for your colormap
-            cmap_min = -0.5
-            cmap_max = 0.5
+            vmax = max(interpolated_values)
+            vmin = min(interpolated_values)
+            vrange_max = max(abs(vmax), abs(vmin))
+            cmap_min = -vrange_max
+            cmap_max = vrange_max
 
             # Create a normalization object to map values to the colormap range
             norm = Normalize(vmin=cmap_min, vmax=cmap_max)
@@ -248,7 +251,7 @@ def main(
     # create cv2 window
     cv2.namedWindow("slider")
     # TODO at the moment window position is magic number
-    cv2.moveWindow("slider", 600, 0)
+    cv2.moveWindow("slider", 600, 40)
 
     # use dataclas instead?
     callback_data = {
