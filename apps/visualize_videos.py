@@ -178,14 +178,17 @@ def create_canvas(size: int) -> npt.NDArray:
     return canvas
 
 
-def map_values(val: float, size: int) -> int:
-    if val >= 0:
-        return int(size / 2 + val * size)
+def map_values(val: float, size: int, zoomed_val: bool = False) -> int:
+    if zoomed_val:
+        return int(val * size)
     else:
-        return int(size / 2 - val * size)
+        if val < 0:
+            return int(size / 2 + val * size)
+        else:
+            return int(size / 2 - val * size)
 
 
-def draw_hand_xz(canvas, landmarks):
+def draw_hand_xz(canvas, landmarks, scaled_landmarks: bool = False):
     height, width, _ = canvas.shape
     # Landmark indices and edges
     edges = [
@@ -230,7 +233,7 @@ def draw_hand_xz(canvas, landmarks):
     # Draw landmarks and edges
     for i in range(21):
         x, y = landmarks[i, [0, 2]]
-        y = map_values(y, height)
+        y = map_values(y, height, scaled_landmarks)
         cv2.putText(
             canvas,
             str(i),
@@ -245,8 +248,8 @@ def draw_hand_xz(canvas, landmarks):
     for edge in edges:
         x1, y1 = landmarks[edge[0], [0, 2]]
         x2, y2 = landmarks[edge[1], [0, 2]]
-        y1_mapped = map_values(y1, height)
-        y2_mapped = map_values(y2, height)
+        y1_mapped = map_values(y1, height, scaled_landmarks)
+        y2_mapped = map_values(y2, height, scaled_landmarks)
 
         line_color = map_line_color(node_a=edge[0], node_b=edge[1])
         cv2.line(
@@ -265,7 +268,7 @@ def draw_hand_xz(canvas, landmarks):
         )
 
         for x, y, value in zip(interpolated_x, interpolated_y, interpolated_values):
-            y_mapped = map_values(y, height)
+            y_mapped = map_values(y, height, scaled_landmarks)
             color_value = int(255 * (value - cmin) / (cmax - cmin))
             color_bgr = (color_value, color_value, color_value)  # BGR format
             cv2.circle(
@@ -285,7 +288,7 @@ def draw_hand_xz(canvas, landmarks):
     return canvas
 
 
-def draw_hand_yz(canvas, landmarks):
+def draw_hand_yz(canvas, landmarks, scaled_landmarks: bool = False):
     height, width, _ = canvas.shape
     # Landmark indices and edges
     edges = [
@@ -330,7 +333,7 @@ def draw_hand_yz(canvas, landmarks):
     # Draw landmarks and edges
     for i in range(21):
         x, y = landmarks[i, [2, 1]]
-        x = map_values(x, width)
+        x = map_values(x, width, scaled_landmarks)
         cv2.putText(
             canvas,
             str(i),
@@ -345,8 +348,8 @@ def draw_hand_yz(canvas, landmarks):
     for edge in edges:
         x1, y1 = landmarks[edge[0], [2, 1]]
         x2, y2 = landmarks[edge[1], [2, 1]]
-        x1_mapped = map_values(x1, width)
-        x2_mapped = map_values(x2, width)
+        x1_mapped = map_values(x1, width, scaled_landmarks)
+        x2_mapped = map_values(x2, width, scaled_landmarks)
 
         line_color = map_line_color(node_a=edge[0], node_b=edge[1])
         cv2.line(
@@ -365,7 +368,7 @@ def draw_hand_yz(canvas, landmarks):
         )
 
         for x, y, value in zip(interpolated_x, interpolated_y, interpolated_values):
-            x_mapped = map_values(x, width)
+            x_mapped = map_values(x, width, scaled_landmarks)
             color_value = int(255 * (value - cmin) / (cmax - cmin))
             color_bgr = (color_value, color_value, color_value)  # BGR format
             cv2.circle(
@@ -413,6 +416,7 @@ def main(
     image_resize_factor: int,
 ):
     """
+    Inspect 'fingerspelling5' dataset
     ```
     python apps/visualize_videos.py \
         --img-data-dir ../../data/ \ 
@@ -421,6 +425,17 @@ def main(
         --person D \
         --letter r
     ```
+
+    
+    Inspect 'self recorded' dataset
+    ```
+    python apps/visualize_videos.py \
+        --img-data-dir ../../data/recorded/asl_alphabet \ 
+        --dataset-dir data/fingerspelling5 \
+        --dataset-name fingerspelling5_singlehands_micha_sorted \
+        --person micha \
+        --letter r
+    ```    
     """
     data_dir = dataset_dir
     example_person = person
@@ -488,7 +503,22 @@ def main(
         canvas_xz = draw_hand_xz(canvas_xz, values)
         canvas_yz = draw_hand_yz(canvas_yz, values)
 
-        img = np.concatenate([canvas_xz, img, canvas_yz], axis=1)
+        img_zoom = np.ones_like(img) * 255
+        canvas_xz_zoom = create_canvas(img.shape[0])
+        canvas_yz_zoom = create_canvas(img.shape[0])
+
+        # Scale values
+        max_values = np.max(values, 0)
+        min_values = np.min(values, 0)
+        values_scaled = (values - min_values) / (max_values - min_values)
+
+        img_zoom = draw_hand(img_zoom, values_scaled, 1)
+        canvas_xz_zoom = draw_hand_xz(canvas_xz_zoom, values_scaled, True)
+        canvas_yz_zoom = draw_hand_yz(canvas_yz_zoom, values_scaled, True)
+
+        top_row = np.concatenate([canvas_xz, img, canvas_yz], axis=1)
+        bottom_row = np.concatenate([canvas_xz_zoom, img_zoom, canvas_yz_zoom], axis=1)
+        img = np.concatenate([top_row, bottom_row])
 
         hand_label = callback_data["frame_img_labels"][callback_data["current_frame"]]
         num_views = callback_data["frame_views"][callback_data["current_frame"]]
