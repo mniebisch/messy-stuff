@@ -1,0 +1,20 @@
+{
+    "build": {"context": "..", "dockerfile": "../Dockerfile", "target": "devcontainer"},
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.isort",
+                "ms-python.black-formatter",
+                "ms-python.mypy-type-checker"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/opt/conda/bin/python"
+            }
+        }
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {}
+    },
+    "postCreateCommand": "pip install -e . --no-deps"
+}
