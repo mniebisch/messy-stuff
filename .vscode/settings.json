@@ -3,11 +3,15 @@
     "python.terminal.activateEnvironment": true,
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter",
-        // "editor.codeActionsOnSave": {
-        //     "source.organizeImports": "explicit"
-        // },
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        },
     },
-    "editor.formatOnSave": true,
+    "isort.args": [
+        "--profile",
+        "black"
+    ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
 }
