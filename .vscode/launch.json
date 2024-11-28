@@ -141,5 +141,27 @@
             "console": "integratedTerminal",
             "justMyCode": false
         },
+        {
+            "name": "Quality Annotation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/apps/visualize_videos.py",
+            "args": [
+                "--img-data-dir",
+                "../../data",
+                "--dataset-dir",
+                "data/fingerspelling5",
+                "--dataset-name",
+                "fingerspelling5_singlehands_sorted",
+                "--image-resize-factor",
+                "5",
+                "--person",
+                "A",
+                "--letter",
+                "a"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
     ]
 }
