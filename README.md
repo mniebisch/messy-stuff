@@ -79,8 +79,24 @@ python scripts/train_fingerspelling5_litcli.py predict \
     --ckpt_path logs/examples/version_0/checkpoints/epoch=8-step=9.ckpt
 ```
 
-
 # Links
-- Mediapipe
-    - [Visualization of landmarks](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker)
-    - [Remarks on landmarks](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker/python)
+## Mediapipe
+- [Visualization of landmarks](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker)
+- [Remarks on landmarks](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker/python)
+
+## Docker
+
+### General
+- [Cheat Sheet](https://docs.docker.com/get-started/docker_cheatsheet.pdf)
+
+### VSCode
+- [VSCode Settings](https://code.visualstudio.com/docs/getstarted/settings)
+- [VSCode devcontainer](https://code.visualstudio.com/docs/devcontainers/containers)
+- [Tutorial devcontainer](https://code.visualstudio.com/docs/devcontainers/tutorial)
+- [Advanced devcontainer](https://code.visualstudio.com/remote/advancedcontainers/overview)
+- [Sharing Git credentials](https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials)
+- [devcontainer.json](https://code.visualstudio.com/docs/devcontainers/create-dev-container)
+- [Devcontainer reference](https://containers.dev/implementors/json_reference/)
+- Devcontainer Features
+    - [Repo](https://github.com/devcontainers/features/tree/main/src)
+    - [VSCode mention](https://code.visualstudio.com/docs/devcontainers/containers#_dev-container-features)

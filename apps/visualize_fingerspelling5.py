@@ -1,16 +1,16 @@
 import itertools
 import pathlib
-from typing import Dict, List
 import re
+from typing import Dict, List
 
 import numpy as np
-from numpy import typing as npt
 import pandas as pd
-from dash import Dash, Input, Output, dcc, html
 import plotly.express as px
 import plotly.graph_objs as go
-from sklearn import metrics as sk_metrics
 import yaml
+from dash import Dash, Input, Output, dcc, html
+from numpy import typing as npt
+from sklearn import metrics as sk_metrics
 
 from fmp.datasets.fingerspelling5 import utils
 

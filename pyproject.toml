@@ -6,11 +6,29 @@ build-backend = "setuptools.build_meta"
 name = "fmp"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["torch", "tensorboard"]
+dependencies = [
+    "click",
+    "dash", 
+    "lightning",
+    "mediapipe",
+    "numpy",
+    "opencv-python", 
+    "pandas",
+    "plotly",
+    "pyyaml",
+    "scikit-image",
+    "scikit-learn",
+    "scipy",
+    "torch",  
+    "torchvision", 
+    "torch_geometric", 
+    "tensorboard", 
+    "tqdm", 
+]
 dynamic = ["version"]
 
 [project.optional-dependencies]
-dev = ["black", "mypy"]
+dev = ["black", "isort", "mypy"]
 test = ["pytest"]
 
 # [tool.mypy]
