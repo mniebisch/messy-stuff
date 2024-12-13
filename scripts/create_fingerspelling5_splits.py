@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 from sklearn import model_selection
 
-
 from fmp.datasets import fingerspelling5
 
 
@@ -39,7 +38,7 @@ def main(dataset_dir: pathlib.Path):
     group_kfold = model_selection.GroupKFold(n_splits=n_splits)
 
     for i, (_, valid_index) in enumerate(group_kfold.split(X, y, groups)):
-        split_overview = landmark_data.loc[:, ["person", "letter"]]
+        split_overview = landmark_data.loc[:, ["person", "letter", "img_file"]]
         split_column = pd.Series(np.repeat("train", len(landmark_data)))
         split_column[valid_index] = "valid"
         split_overview["split"] = split_column

@@ -1,15 +1,14 @@
 import pathlib
-from typing import List, Optional, Tuple
 import warnings
+from typing import List, Optional, Tuple
 
-import pandas as pd
 import lightning as L
+import pandas as pd
+from numpy import typing as npt
 from torch.utils import data as torch_data
 from torch_geometric.transforms import BaseTransform
-from numpy import typing as npt
 
 from fmp.datasets import fingerspelling5
-
 
 __all__ = ["Fingerspelling5LandmarkDataModule"]
 
@@ -164,12 +163,10 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         if len(split_data) != len(landmark_data):
             raise ValueError("Landmark data and split data are not of same length.")
 
-        if not all(landmark_data["person"] == split_data["person"]) or not all(
-            landmark_data["letter"] == split_data["letter"]
-        ):
+        if not all(landmark_data["img_file"] == split_data["img_file"]):
             raise ValueError(
-                "Sanity check between 'split_data' and 'landmark_data' shows "
-                "that the order of rows has change. Please fix."
+                "Sources for landmark data and split data are not the same or "
+                "the order has changed."
             )
 
         if (
