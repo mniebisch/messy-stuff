@@ -73,6 +73,18 @@
             "justMyCode": false
         },
         {
+            "name": "Create Dataquality [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/create_fingerspelling5_dummy_dataquality.py",
+            "args": [
+                "--dataset-dir",
+                "data/fingerspelling5/fingerspelling5_dummy"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Metric Computation",
             "type": "debugpy",
             "request": "launch",
