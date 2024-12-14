@@ -23,6 +23,7 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         valid_transforms: Optional[BaseTransform] = None,
         predict_transforms: Optional[BaseTransform] = None,
         datasplit_file: Optional[str] = None,
+        dataquality_file: Optional[str] = None,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -34,12 +35,16 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         self.valid_transforms = valid_transforms
         self.predict_transforms = predict_transforms
         self.datasplit_file = datasplit_file
+        self.dataquality_file = dataquality_file
 
         self.fingerspelling5_csv = self.get_data_filename()
         self.validate_dataset_dir()
 
         if self.datasplit_file is not None:
             self.validate_datasplit_file(self.datasplit_file)
+
+        if self.dataquality_file is not None:
+            self.validate_dataquality_file(self.dataquality_file)
 
     def setup(self, stage: str):
         filter_nans = True
@@ -57,6 +62,13 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
             self.validate_datasplit_data(landmark_data)
             # hm, can split file change between these line?
             train_index, val_index = self.load_datasplit_indices()
+
+            if self.dataquality_file is not None:
+                self.validate_dataquality_data(landmark_data)
+                quality_indices = pd.read_csv(self.dataquality_file)["is_corrupted"]
+
+                train_index = train_index & ~quality_indices.values
+                val_index = val_index & ~quality_indices.values
 
             train_data = landmark_data.loc[train_index]
             valid_data = landmark_data.loc[val_index]
@@ -195,6 +207,29 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         dataset_name = self.extract_dataset_name()
         file_name = f"{dataset_name}.csv"
         return dataset_path / file_name
+
+    def validate_dataquality_file(self, dataquality_file: str) -> None:
+        if not pathlib.Path(dataquality_file).exists():
+            raise ValueError(f"Invalid dataquality file '{dataquality_file}'.")
+
+    def validate_dataquality_data(self, landmark_data: pd.DataFrame) -> None:
+        dataquality_data = pd.read_csv(self.dataquality_file)
+
+        if len(dataquality_data) != len(landmark_data):
+            raise ValueError(
+                "Landmark data and dataquality data are not of same length."
+            )
+
+        if not all(landmark_data["img_file"] == dataquality_data["img_file"]):
+            raise ValueError(
+                "Sources for landmark data and dataquality data are not the same or "
+                "the order has changed."
+            )
+
+        if "is_corrupted" not in dataquality_data.columns:
+            raise ValueError(
+                "Expect the column 'is_corrupted' in dataquality data but didn't found it."
+            )
 
 
 def _extract_data_csv_files(data_dir: pathlib.Path) -> List[pathlib.Path]:

@@ -49,6 +49,16 @@ python scripts/create_fingerspelling5_splits.py \
     --dataset-dir=data/fingerspelling5/fingerspelling5_dummy
 ```
 
+
+### Create dataquality file for dummy data.
+For actual fingerspelling5 dataset manual labeling can be performed using the following [script](apps/visualize_videos.py).
+
+Create fake label to test or play with pipeline:
+```
+python scripts/create_fingerspelling5_dummy_dataquality.py \
+    --dataset-dir=data/fingerspelling/fingerspelling_dummy 
+```
+
 ### Compute descriptive statistics for dataset.
 #### Normalized Landmarks
 Compute metrics [scaled](https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.transforms.NormalizeScale.html#torch_geometric.transforms.NormalizeScale) data.

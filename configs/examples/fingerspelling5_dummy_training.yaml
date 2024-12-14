@@ -25,6 +25,7 @@ model:
 data:
   dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
   datasplit_file: ./data/fingerspelling5/fingerspelling5_dummy/split_00_fingerspelling5_dummy.csv
+  dataquality_file: ./data/fingerspelling5/fingerspelling5_dummy/fingerspelling5_dummy__data_quality.csv
   batch_size: 128
   train_transforms:
     class_path: torch_geometric.transforms.Compose
