@@ -175,5 +175,19 @@
             "console": "integratedTerminal",
             "justMyCode": false
         },
+        {
+            "name": "Train eval pipeline [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/pipelines/fingerspelling5/train_eval.py",
+            "args": [
+                "--train-config",
+                "configs/examples/fingerspelling5_dummy_training.yaml",
+                "--predict-config",
+                "configs/examples/fingerspelling5_dummy_prediction.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
     ]
 }
