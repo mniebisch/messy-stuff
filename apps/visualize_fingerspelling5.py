@@ -266,28 +266,46 @@ def add_letter_trace(
     )
 
 
+def get_predictions_file(predictions_meta_filepath: pathlib.Path) -> pathlib.Path:
+    with open(predictions_meta_filepath, "r") as predictions_meta_file:
+        predictions_meta = yaml.safe_load(predictions_meta_file)
+
+    return pathlib.Path(predictions_meta["prediction_output"])
+
+
+def get_dataset_name(predictions_meta_filepath: pathlib.Path) -> str:
+    predictions_filename = predictions_meta_filepath.name
+    _, dataset_name, _, _ = predictions_filename.split("__")
+
+    return dataset_name
+
+
 # Load data
 root_path = pathlib.Path(__file__).parent.parent
+
+train_data_prediction_file = (
+    pathlib.Path("predictions")
+    / "fingerspelling5_mlp"
+    / "prediction__fingerspelling5_singlehands_sorted__version_2__epoch=59-step=47520.yaml"
+)
+
+test_data_prediction_file = (
+    pathlib.Path("predictions")
+    / "fingerspelling5_mlp"
+    / "prediction__fingerspelling5_singlehands_micha_sorted__version_2__epoch=59-step=47520.yaml"
+)
 
 metrics_path = root_path / "metrics"
 data_path = root_path / "data" / "fingerspelling5"
 predictions_path = root_path / "predictions"
 predictions_path = predictions_path / "fingerspelling5_mlp"
 
-dataset_name = "fingerspelling5_singlehands_sorted"
-
-# TODO save hparams for prediction similar to metric computation
-# TODO add dataset name to pred filename? or read from yaml?
-# is going to change the most?
-ckpt_name = "version_2__epoch=59-step=47520"
-predictions_filename = f"prediction__{dataset_name}__{ckpt_name}.csv"
-# predictions_full_path = predictions_path / "example" / predictions_filename
-predictions_full_path = predictions_path / predictions_filename
-# predictions_file = predictions_path / "prediction__version_22__epoch=17-step=36.csv"
+dataset_name = get_dataset_name(train_data_prediction_file)
+predictions_full_path = get_predictions_file(root_path / train_data_prediction_file)
 
 fingerspelling_data = load_dataset(data_path, dataset_name)
 metrics = load_metrics(metrics_path, dataset_name)
-predictions = load_predictions(predictions_full_path)
+predictions = load_predictions(root_path / predictions_full_path)
 predictions["dataset"] = dataset_name
 
 predictions_hparams = load_predictions_hparams(predictions_full_path)
@@ -295,13 +313,13 @@ training_datasplit = load_training_datasplit(predictions_hparams)
 training_datasplit = training_datasplit.reset_index(names=["batch_indices"])
 
 # load recorded data
-recorded_dataset_name = "fingerspelling5_singlehands_micha_sorted"
+recorded_dataset_name = get_dataset_name(test_data_prediction_file)
 recorded_data = load_dataset(data_path, recorded_dataset_name)
 metrics_recorded = load_metrics(metrics_path, recorded_dataset_name)
-predictions_recorded_filename = f"prediction__{recorded_dataset_name}__{ckpt_name}.csv"
-predictions_recorded = load_predictions(
-    predictions_path / predictions_recorded_filename
+predictions_recorded_filename = get_predictions_file(
+    root_path / test_data_prediction_file
 )
+predictions_recorded = load_predictions(root_path / predictions_recorded_filename)
 predictions_recorded["split"] = "test"
 predictions_recorded["dataset"] = recorded_dataset_name
 
