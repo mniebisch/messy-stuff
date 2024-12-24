@@ -1,15 +1,19 @@
 import pathlib
-from typing import Any, Literal, List, Dict, Union
+from typing import Any, Dict, List, Literal, Union
 
 import numpy as np
 import pandas as pd
+import torch_geometric.transforms as pyg_transforms
+import torchvision.transforms.v2 as transforms
 import yaml
 from lightning import LightningModule, Trainer
 from lightning.pytorch.callbacks import BasePredictionWriter
-import torchvision.transforms.v2 as transforms
-import torch_geometric.transforms as pyg_transforms
 
-from fmp.datasets.fingerspelling5 import metrics, utils
+from fmp.datasets.fingerspelling5 import (
+    Fingerspelling5LandmarkDataModule,
+    metrics,
+    utils,
+)
 
 __all__ = ["Fingerseplling5MetricWriter"]
 
@@ -50,17 +54,25 @@ class Fingerseplling5MetricWriter(BasePredictionWriter):
 
         return None
 
-    def on_predict_batch_start(
-        self,
-        trainer: Trainer,
-        pl_module: LightningModule,
-        batch: Any,
-        batch_idx: int,
-        dataloader_idx: int = 0,
+    def on_predict_epoch_start(
+        self, trainer: Trainer, pl_module: LightningModule
     ) -> None:
         pred_transforms = trainer.datamodule.predict_data._transforms
 
         validate_pred_transforms(pred_transforms)
+        validate_pred_datamodule(trainer.datamodule)
+
+    # def on_predict_batch_start(
+    #     self,
+    #     trainer: Trainer,
+    #     pl_module: LightningModule,
+    #     batch: Any,
+    #     batch_idx: int,
+    #     dataloader_idx: int = 0,
+    # ) -> None:
+    #     pred_transforms = trainer.datamodule.predict_data._transforms
+
+    #     validate_pred_transforms(pred_transforms)
 
     def on_predict_epoch_end(
         self, trainer: Trainer, pl_module: LightningModule
@@ -69,6 +81,7 @@ class Fingerseplling5MetricWriter(BasePredictionWriter):
         batch_indices = np.arange(len(self.result_collection))
         results = pd.DataFrame(self.result_collection)
         results["batch_indices"] = batch_indices
+        results["img_file"] = trainer.datamodule.predict_data._landmark_data["img_file"]
 
         dataset_name = trainer.datamodule.extract_dataset_name()
         pred_transforms = trainer.datamodule.predict_data._transforms
@@ -115,6 +128,14 @@ def validate_custom_pred_transforms(
             "Invalid transform applied. "
             "For metric computation only PyGs NormalizeScale is valid or "
             "no tranformation at all. "
+        )
+
+
+def validate_pred_datamodule(datamodule: Fingerspelling5LandmarkDataModule) -> None:
+    if datamodule.dataquality_file is not None:
+        raise ValueError(
+            "A dataquality file was provided. "
+            "There is no need in running metric computation only on good or bad data."
         )
 
 
