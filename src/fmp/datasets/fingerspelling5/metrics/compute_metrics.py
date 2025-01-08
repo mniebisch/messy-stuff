@@ -1,12 +1,11 @@
+import functools
 import itertools
 from dataclasses import fields
-import functools
 from typing import Any, Callable, Dict, List, Tuple
 
 from numpy import typing as npt
 
 from fmp.datasets.fingerspelling5 import metrics, utils
-
 
 __all__ = ["FingerspellingMetrics"]
 
@@ -29,7 +28,11 @@ def compute_metric_combinations(
 class FingerspellingMetrics:
     def __init__(self):
         # Setup argument iterables
-        parts = [field.name for field in fields(utils.mediapipe_hand_landmarks.parts)]
+        parts = [
+            field.name
+            for field in fields(utils.mediapipe_hand_landmarks.parts)
+            if field.name != "wrist"
+        ]
         planes = list(
             itertools.combinations(utils.mediapipe_hand_landmarks.spatial_coords, 2)
         )
