@@ -5,8 +5,8 @@ import numpy as np
 from numpy import typing as npt
 from scipy import spatial
 
-from . import utils as metric_utils
 from .. import utils as fs5_utils
+from . import utils as metric_utils
 
 __all__ = ["compute_hand_plane_perimeter", "compute_hand_plane_area", "space_wrapper"]
 
