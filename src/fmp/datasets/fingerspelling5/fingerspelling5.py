@@ -1,14 +1,18 @@
-from typing import Tuple, Optional
+import pathlib
+from typing import Optional, Tuple, Union
 
+import albumentations as A
+import cv2
 import numpy as np
 import pandas as pd
 import torch
+from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset
 from torchvision.transforms import v2
 
 from . import utils
 
-__all__ = ["Fingerspelling5Landmark"]
+__all__ = ["Fingerspelling5Image", "Fingerspelling5Landmark"]
 
 
 class Fingerspelling5Landmark(Dataset):
@@ -91,3 +95,75 @@ class Fingerspelling5Landmark(Dataset):
             else [pre_transforms, transforms, post_transforms]
         )
         return v2.Compose(trans)
+
+
+class Fingerspelling5Image(Dataset):
+    def __init__(
+        self,
+        file_data: pd.DataFrame,
+        dataset_path: pathlib.Path,
+        transforms: Optional[Union[A.BaseCompose, A.BasicTransform]] = None,
+        split: Optional[str] = None,
+    ) -> None:
+        self.split = split
+
+        # fingerspelling5 'properties'
+        self.letters = utils.fingerspelling5.letters
+        self.num_letters = len(self.letters)
+
+        self._label_transforms = self._setup_label_transforms()
+
+        self.transforms = self._setup_transforms(transforms)
+        self.file_data = file_data
+        self.dataset_path = dataset_path
+
+    def __len__(self) -> int:
+        return len(self.file_data)
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        sample = self.file_data.iloc[idx]
+        image_file = sample["img_file"]
+        label = sample["letter"]
+
+        image = cv2.imread(self.dataset_path / image_file)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        if self.transforms is not None:
+            image = self.transforms(image=image)["image"]
+
+        label = self._label_transforms(self.letters.index(label))
+
+        return image, label
+
+    def _setup_label_transforms(self):
+        return v2.Compose(
+            [
+                utils.OneHotLabel(self.num_letters),
+                utils.NDArrayToTensor(),
+                v2.ToDtype(torch.float32),
+            ]
+        )
+
+    def _setup_transforms(
+        self, transforms: Optional[Union[A.BaseCompose, A.BasicTransform]]
+    ) -> A.Compose:
+        if transforms is None:
+            transforms = A.Compose([A.ToFloat(), ToTensorV2()])
+        elif isinstance(transforms, A.BaseCompose):
+            transforms = A.Compose(transforms.transforms + [A.ToFloat(), ToTensorV2()])
+        elif isinstance(transforms, A.BasicTransform):
+            transforms = A.Compose([transforms, A.ToFloat(), ToTensorV2()])
+        else:
+            raise ValueError("Invalid transforms type")
+
+        #  match transforms:
+        #     case None:
+        #         transforms = A.Compose([A.ToFloat(), ToTensorV2()])
+        #     case A.BaseCompose():
+        #         transforms = A.Compose(transforms.transforms + [A.ToFloat(), ToTensorV2()])
+        #     case A.BasicTransform():
+        #         transforms = A.Compose([transforms, A.ToFloat(), ToTensorV2()])
+        #     case _:
+        #         raise ValueError("Invalid transforms type")
+
+        return transforms
