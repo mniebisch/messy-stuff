@@ -66,74 +66,6 @@ def create_random_dataquality_file(data_path: pathlib.Path, dataset_name: str) -
     )
 
 
-@task
-def compute_metrics_unscaled(
-    config_path: pathlib.Path,
-    metrics_output_path: pathlib.Path,
-    data_path: pathlib.Path,
-    dataset_name: str,
-) -> None:
-    script_path = (
-        get_workspace_path() / "scripts" / "compute_fingerspelling5_metrics.py"
-    )
-    config_path = (
-        get_workspace_path()
-        / "configs"
-        / "examples"
-        / "fingerspelling5_dummy_metrics_unscaled.yaml"
-    )
-
-    dataset_path = data_path / dataset_name
-
-    subprocess.run(
-        [
-            "python",
-            str(script_path),
-            "predict",
-            "--config",
-            str(config_path),
-            "--trainer.callbacks.init_args.output_dir",
-            str(metrics_output_path),
-            "--data.dataset_dir",
-            str(dataset_path),
-        ]
-    )
-
-
-@task
-def compute_metrics_scaled(
-    config_path: pathlib.Path,
-    metrics_output_path: pathlib.Path,
-    data_path: pathlib.Path,
-    dataset_name: str,
-) -> None:
-    script_path = (
-        get_workspace_path() / "scripts" / "compute_fingerspelling5_metrics.py"
-    )
-    config_path = (
-        get_workspace_path()
-        / "configs"
-        / "examples"
-        / "fingerspelling5_dummy_metrics_scaled.yaml"
-    )
-
-    dataset_path = data_path / dataset_name
-
-    subprocess.run(
-        [
-            "python",
-            str(script_path),
-            "predict",
-            "--config",
-            str(config_path),
-            "--trainer.callbacks.init_args.output_dir",
-            str(metrics_output_path),
-            "--data.dataset_dir",
-            str(dataset_path),
-        ]
-    )
-
-
 @flow
 def pipeline():
     data_path = get_workspace_path() / "data" / "fingerspelling5"
@@ -144,21 +76,6 @@ def pipeline():
     create_dataset(data_path, dataset_name, num_persons, num_samples)
     create_datasplits(data_path, dataset_name)
     create_random_dataquality_file(data_path, dataset_name)
-
-    unscaled_metrics_config = (
-        get_workspace_path()
-        / "configs"
-        / "examples"
-        / "fingerspelling5_dummy_metrics_unscaled.yaml"
-    )
-    metrics_output_path = get_workspace_path() / "metrics"
-
-    compute_metrics_unscaled(
-        unscaled_metrics_config, metrics_output_path, data_path, dataset_name
-    )
-    compute_metrics_scaled(
-        unscaled_metrics_config, metrics_output_path, data_path, dataset_name
-    )
 
 
 if __name__ == "__main__":
