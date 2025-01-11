@@ -7,23 +7,24 @@ name = "fmp"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "albumentations",
     "click",
-    "dash", 
+    "dash",
     "lightning",
     "mediapipe",
     "numpy",
-    "opencv-python", 
+    "opencv-python",
     "pandas",
     "plotly",
     "pyyaml",
     "scikit-image",
     "scikit-learn",
     "scipy",
-    "torch",  
-    "torchvision", 
-    "torch_geometric", 
-    "tensorboard", 
-    "tqdm", 
+    "torch",
+    "torchvision",
+    "torch_geometric",
+    "tensorboard",
+    "tqdm",
 ]
 dynamic = ["version"]
 
