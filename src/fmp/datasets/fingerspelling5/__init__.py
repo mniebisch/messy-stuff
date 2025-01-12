@@ -4,11 +4,13 @@ from fmp.datasets.fingerspelling5.fingerspelling5 import (
     Fingerspelling5Landmark,
 )
 from fmp.datasets.fingerspelling5.fingerspelling5_lit import (
+    Fingerspelling5ImageDataModule,
     Fingerspelling5LandmarkDataModule,
 )
 
 __all__ = [
     "Fingerspelling5Image",
+    "Fingerspelling5ImageDataModule",
     "Fingerspelling5Landmark",
     "Fingerspelling5LandmarkDataModule",
     "features",

@@ -1,7 +1,8 @@
 import pathlib
 import warnings
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
+import albumentations as A
 import lightning as L
 import pandas as pd
 from numpy import typing as npt
@@ -10,7 +11,7 @@ from torch_geometric.transforms import BaseTransform
 
 from fmp.datasets import fingerspelling5
 
-__all__ = ["Fingerspelling5LandmarkDataModule"]
+__all__ = ["Fingerspelling5ImageDataModule", "Fingerspelling5LandmarkDataModule"]
 
 
 class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
@@ -230,6 +231,116 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
             raise ValueError(
                 "Expect the column 'is_corrupted' in dataquality data but didn't found it."
             )
+
+
+class Fingerspelling5ImageDataModule(L.LightningDataModule):
+    def __init__(
+        self,
+        datasplit_file: str,
+        images_data_dir: str,
+        batch_size: int,
+        num_dataloader_workers: int = 0,
+        train_transforms: Optional[Union[A.BaseCompose, A.BasicTransform]] = None,
+        valid_transforms: Optional[Union[A.BaseCompose, A.BasicTransform]] = None,
+        predict_transforms: Optional[Union[A.BaseCompose, A.BasicTransform]] = None,
+        dataquality_file: Optional[str] = None,
+    ) -> None:
+        # TODO add validation if required
+        # TODO maybe find better name than datasplit file? predict case!?
+        super().__init__()
+        self.save_hyperparameters()
+
+        self.images_data_dir = images_data_dir
+        self.batch_size = batch_size
+        self.num_dataloader_workers = num_dataloader_workers
+        self.train_transforms = train_transforms
+        self.valid_transforms = valid_transforms
+        self.predict_transforms = predict_transforms
+        self.datasplit_file = datasplit_file
+        self.dataquality_file = dataquality_file
+
+    def setup(self, stage: str) -> None:
+        if stage == "fit":
+            fingerspelling5_data = pd.read_csv(self.datasplit_file)
+
+            self.train_data = fingerspelling5.Fingerspelling5Image(
+                fingerspelling5_data.loc[
+                    fingerspelling5_data["split"] == "train"
+                ].reset_index(drop=True),
+                pathlib.Path(self.images_data_dir),
+                transforms=self.train_transforms,
+            )
+
+            self.valid_train_data = fingerspelling5.Fingerspelling5Image(
+                fingerspelling5_data.loc[
+                    fingerspelling5_data["split"] == "train"
+                ].reset_index(drop=True),
+                pathlib.Path(self.images_data_dir),
+                transforms=self.valid_transforms,
+                split="train",
+            )
+
+            self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
+                fingerspelling5_data.loc[
+                    fingerspelling5_data["split"] == "valid"
+                ].reset_index(drop=True),
+                pathlib.Path(self.images_data_dir),
+                transforms=self.valid_transforms,
+                split="valid",
+            )
+        elif stage == "test":
+            pass
+        elif stage == "predict":
+            fingerspelling5_data = pd.read_csv(self.datasplit_file)
+
+            self.predict_data = fingerspelling5.Fingerspelling5Image(
+                fingerspelling5_data,
+                pathlib.Path(self.images_data_dir),
+                transforms=self.predict_transforms,
+            )
+        else:
+            pass
+
+    def prepare_data(self) -> None:
+        pass
+
+    def train_dataloader(self) -> torch_data.DataLoader:
+        return torch_data.DataLoader(
+            self.train_data,
+            batch_size=self.batch_size,
+            shuffle=True,
+            drop_last=True,
+            num_workers=self.num_dataloader_workers,
+        )
+
+    def val_dataloader(self) -> List[torch_data.DataLoader]:
+        train_loader = torch_data.DataLoader(
+            self.valid_train_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_dataloader_workers,
+        )
+        valid_loader = torch_data.DataLoader(
+            self.valid_valid_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_dataloader_workers,
+        )
+        return [train_loader, valid_loader]
+
+    def test_dataloader(self) -> None:
+        raise NotImplementedError
+
+    def predict_dataloader(self) -> torch_data.DataLoader:
+        return torch_data.DataLoader(
+            self.predict_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_dataloader_workers,
+        )
 
 
 def _extract_data_csv_files(data_dir: pathlib.Path) -> List[pathlib.Path]:
