@@ -247,6 +247,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
     ) -> None:
         # TODO add validation if required
         # TODO maybe find better name than datasplit file? predict case!?
+        # TODO read dataquality file and check if it is valid
         super().__init__()
         self.save_hyperparameters()
 

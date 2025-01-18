@@ -23,38 +23,40 @@ model:
     apply_dropout: true
     dropout_rate: 0.2
 data:
-  dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
-  datasplit_file: ./data/fingerspelling5/fingerspelling5_dummy/split_00_fingerspelling5_dummy.csv
-  dataquality_file: ./data/fingerspelling5/fingerspelling5_dummy/fingerspelling5_dummy__data_quality.csv
-  batch_size: 128
-  train_transforms:
-    class_path: torch_geometric.transforms.Compose
-    init_args:
-      transforms:
-        - class_path: torch_geometric.transforms.NormalizeScale
-        - class_path: torch_geometric.transforms.RandomFlip
-          init_args:
-            axis: 0
-        - class_path: torch_geometric.transforms.RandomJitter
-          init_args:
-            translate: 0.05
-        - class_path: torch_geometric.transforms.RandomRotate
-          init_args:
-            degrees: 20
-            axis: 0
-        - class_path: torch_geometric.transforms.RandomRotate
-          init_args:
-            degrees: 20
-            axis: 1
-        - class_path: torch_geometric.transforms.RandomRotate
-          init_args:
-            degrees: 20
-            axis: 2
-  valid_transforms:
-    class_path: torch_geometric.transforms.Compose
-    init_args:
-      transforms:
-        - class_path: torch_geometric.transforms.NormalizeScale
+  class_path: fmp.datasets.fingerspelling5.Fingerspelling5LandmarkDataModule
+  init_args:
+    dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
+    datasplit_file: ./data/fingerspelling5/fingerspelling5_dummy/split_00_fingerspelling5_dummy.csv
+    dataquality_file: ./data/fingerspelling5/fingerspelling5_dummy/fingerspelling5_dummy__data_quality.csv
+    batch_size: 128
+    train_transforms:
+      class_path: torch_geometric.transforms.Compose
+      init_args:
+        transforms:
+          - class_path: torch_geometric.transforms.NormalizeScale
+          - class_path: torch_geometric.transforms.RandomFlip
+            init_args:
+              axis: 0
+          - class_path: torch_geometric.transforms.RandomJitter
+            init_args:
+              translate: 0.05
+          - class_path: torch_geometric.transforms.RandomRotate
+            init_args:
+              degrees: 20
+              axis: 0
+          - class_path: torch_geometric.transforms.RandomRotate
+            init_args:
+              degrees: 20
+              axis: 1
+          - class_path: torch_geometric.transforms.RandomRotate
+            init_args:
+              degrees: 20
+              axis: 2
+    valid_transforms:
+      class_path: torch_geometric.transforms.Compose
+      init_args:
+        transforms:
+          - class_path: torch_geometric.transforms.NormalizeScale
 optimizer:
   class_path: torch.optim.AdamW
   init_args:

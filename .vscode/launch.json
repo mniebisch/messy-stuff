@@ -124,7 +124,7 @@
             "justMyCode": false
         },
         {
-            "name": "Train Model [Dummy]",
+            "name": "Train Landmarks [Dummy]",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
@@ -132,6 +132,19 @@
                 "fit",
                 "--config",
                 "configs/examples/fingerspelling5_dummy_training.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Train Vision [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
+            "args": [
+                "fit",
+                "--config",
+                "configs/examples/fingerspelling5_dummy_training_vision.yaml"
             ],
             "console": "integratedTerminal",
             "justMyCode": false
@@ -185,6 +198,34 @@
                 "configs/examples/fingerspelling5_dummy_training.yaml",
                 "--predict-config",
                 "configs/examples/fingerspelling5_dummy_prediction.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Explore train results",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/apps/visualize_fingerspelling5.py",
+            "args": [
+                "--train-data-prediction-file",
+                "predictions/fingerspelling5_mlp/prediction__fingerspelling5_singlehands_sorted__version_2__epoch=59-step=47520.yaml",
+                "--test-data-prediction-file",
+                "predictions/fingerspelling5_mlp/prediction__fingerspelling5_singlehands_micha_sorted__version_2__epoch=59-step=47520.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Create Image Data [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/create_fingerspelling5_dummy_images.py",
+            "args": [
+                "--data-directory",
+                "../../data/",
+                "--csv-path",
+                "data/fingerspelling5/fingerspelling5_dummy/fingerspelling5_dummy.csv",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
