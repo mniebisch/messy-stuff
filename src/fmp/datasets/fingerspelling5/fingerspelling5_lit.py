@@ -247,7 +247,6 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
     ) -> None:
         # TODO add validation if required
         # TODO maybe find better name than datasplit file? predict case!?
-        # TODO read dataquality file and check if it is valid
         super().__init__()
         self.save_hyperparameters()
 
@@ -264,27 +263,34 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         if stage == "fit":
             fingerspelling5_data = pd.read_csv(self.datasplit_file)
 
+            train_index = fingerspelling5_data["split"] == "train"
+            valid_index = fingerspelling5_data["split"] == "valid"
+
+            if self.dataquality_file is not None:
+                dataquality_data = pd.read_csv(self.dataquality_file)
+                quality_indices = dataquality_data["is_corrupted"]
+
+                train_index = train_index & ~quality_indices.values
+                valid_index = valid_index & ~quality_indices.values
+
+            train_data = fingerspelling5_data.loc[train_index].reset_index(drop=True)
+            valid_data = fingerspelling5_data.loc[valid_index].reset_index(drop=True)
+
             self.train_data = fingerspelling5.Fingerspelling5Image(
-                fingerspelling5_data.loc[
-                    fingerspelling5_data["split"] == "train"
-                ].reset_index(drop=True),
+                train_data,
                 pathlib.Path(self.images_data_dir),
                 transforms=self.train_transforms,
             )
 
             self.valid_train_data = fingerspelling5.Fingerspelling5Image(
-                fingerspelling5_data.loc[
-                    fingerspelling5_data["split"] == "train"
-                ].reset_index(drop=True),
+                train_data,
                 pathlib.Path(self.images_data_dir),
                 transforms=self.valid_transforms,
                 split="train",
             )
 
             self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
-                fingerspelling5_data.loc[
-                    fingerspelling5_data["split"] == "valid"
-                ].reset_index(drop=True),
+                valid_data,
                 pathlib.Path(self.images_data_dir),
                 transforms=self.valid_transforms,
                 split="valid",

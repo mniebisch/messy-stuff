@@ -21,6 +21,7 @@ data:
   init_args:
     datasplit_file: ./data/fingerspelling5/fingerspelling5_dummy/split_00_fingerspelling5_dummy.csv
     images_data_dir: ../../data/
+    dataquality_file: ./data/fingerspelling5/fingerspelling5_dummy/fingerspelling5_dummy__data_quality.csv
     batch_size: 64
     num_dataloader_workers: 23
 optimizer:
