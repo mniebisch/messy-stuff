@@ -24,6 +24,13 @@ data:
     dataquality_file: ./data/fingerspelling5/fingerspelling5_dummy/fingerspelling5_dummy__data_quality.csv
     batch_size: 64
     num_dataloader_workers: 23
+    train_transforms:
+      class_path: albumentations.Compose
+      init_args:
+        transforms:
+          - class_path: albumentations.HorizontalFlip
+            init_args:
+              p: 0.5
 optimizer:
   class_path: torch.optim.AdamW
   init_args:
