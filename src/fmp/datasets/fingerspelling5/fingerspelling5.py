@@ -6,8 +6,9 @@ import cv2
 import numpy as np
 import pandas as pd
 import torch
-from albumentations.pytorch import ToTensorV2
+from PIL import Image
 from torch.utils.data import Dataset
+from torchvision import tv_tensors
 from torchvision.transforms import v2
 
 from . import utils
@@ -127,9 +128,11 @@ class Fingerspelling5Image(Dataset):
 
         image = cv2.imread(self.dataset_path / image_file)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = Image.fromarray(image)
+        image = tv_tensors.Image(image)
 
         if self.transforms is not None:
-            image = self.transforms(image=image)["image"]
+            image = self.transforms(image)
 
         label = self._label_transforms(self.letters.index(label))
 
@@ -145,25 +148,13 @@ class Fingerspelling5Image(Dataset):
         )
 
     def _setup_transforms(
-        self, transforms: Optional[Union[A.BaseCompose, A.BasicTransform]]
-    ) -> A.Compose:
+        self, transforms: Optional[v2.Transform] = None
+    ) -> v2.Compose:
+        conversion = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
+        # normalize = v2.Normalize() # TODO extract params from dataset
         if transforms is None:
-            transforms = A.Compose([A.ToFloat(), ToTensorV2()])
-        elif isinstance(transforms, A.BaseCompose):
-            transforms = A.Compose(transforms.transforms + [A.ToFloat(), ToTensorV2()])
-        elif isinstance(transforms, A.BasicTransform):
-            transforms = A.Compose([transforms, A.ToFloat(), ToTensorV2()])
+            transforms = conversion
         else:
-            raise ValueError("Invalid transforms type")
-
-        #  match transforms:
-        #     case None:
-        #         transforms = A.Compose([A.ToFloat(), ToTensorV2()])
-        #     case A.BaseCompose():
-        #         transforms = A.Compose(transforms.transforms + [A.ToFloat(), ToTensorV2()])
-        #     case A.BasicTransform():
-        #         transforms = A.Compose([transforms, A.ToFloat(), ToTensorV2()])
-        #     case _:
-        #         raise ValueError("Invalid transforms type")
+            transforms = v2.Compose([transforms, conversion])
 
         return transforms

@@ -25,10 +25,10 @@ data:
     batch_size: 64
     num_dataloader_workers: 23
     train_transforms:
-      class_path: albumentations.Compose
+      class_path: torchvision.transforms.v2.Compose
       init_args:
         transforms:
-          - class_path: albumentations.HorizontalFlip
+          - class_path: torchvision.transforms.v2.RandomHorizontalFlip
             init_args:
               p: 0.5
 optimizer:

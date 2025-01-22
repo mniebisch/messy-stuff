@@ -1,13 +1,13 @@
 import pathlib
 import warnings
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
-import albumentations as A
 import lightning as L
 import pandas as pd
 from numpy import typing as npt
 from torch.utils import data as torch_data
 from torch_geometric.transforms import BaseTransform
+from torchvision.transforms import v2
 
 from fmp.datasets import fingerspelling5
 
@@ -240,9 +240,9 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         images_data_dir: str,
         batch_size: int,
         num_dataloader_workers: int = 0,
-        train_transforms: Optional[Union[A.BaseCompose, A.BasicTransform]] = None,
-        valid_transforms: Optional[Union[A.BaseCompose, A.BasicTransform]] = None,
-        predict_transforms: Optional[Union[A.BaseCompose, A.BasicTransform]] = None,
+        train_transforms: Optional[v2.Transform] = None,
+        valid_transforms: Optional[v2.Transform] = None,
+        predict_transforms: Optional[v2.Transform] = None,
         dataquality_file: Optional[str] = None,
     ) -> None:
         # TODO add validation if required
