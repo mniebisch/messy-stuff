@@ -7,11 +7,13 @@ trainer:
         output_dir: ./predictions/example
   logger: null
 data:
-  dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
-  batch_size: 128
-  predict_transforms:
-    class_path: torch_geometric.transforms.Compose
-    init_args:
-      transforms:
-        - class_path: torch_geometric.transforms.NormalizeScale
+  class_path: fmp.datasets.fingerspelling5.Fingerspelling5LandmarkDataModule
+  init_args:
+    dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
+    batch_size: 128
+    predict_transforms:
+      class_path: torch_geometric.transforms.Compose
+      init_args:
+        transforms:
+          - class_path: torch_geometric.transforms.NormalizeScale
 return_predictions: False
