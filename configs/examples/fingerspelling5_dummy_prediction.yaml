@@ -10,6 +10,8 @@ data:
   class_path: fmp.datasets.fingerspelling5.Fingerspelling5LandmarkDataModule
   init_args:
     dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
+    datasplit_file: null
+    dataquality_file: null
     batch_size: 128
     predict_transforms:
       class_path: torch_geometric.transforms.Compose
