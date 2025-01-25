@@ -86,7 +86,7 @@ def create_random_images(data_path: pathlib.Path, csv_file: pathlib.Path) -> Non
 @flow
 def pipeline():
     data_path = get_workspace_path() / "data" / "fingerspelling5"
-    dataset_name = "fingerspelling5_dummy1"
+    dataset_name = "fingerspelling5_dummy"
     num_persons = 3
     num_samples = 4
 
