@@ -1,12 +1,12 @@
 import pathlib
 from typing import Any, Literal, Sequence, Union
 
-import torch
 import numpy as np
 import pandas as pd
+import torch
+import yaml
 from lightning import LightningModule, Trainer
 from lightning.pytorch.callbacks import BasePredictionWriter
-import yaml
 
 from fmp.datasets import fingerspelling5
 
@@ -48,9 +48,13 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
 
         predictions = torch.concat(predictions)
         batch_indices = np.concatenate([bi for bi in batch_indices[0]], dtype=int)
+        # TODO Attention! won't work for vision dataset
+        img_files = trainer.datamodule.predict_data._landmark_data["img_file"]
 
         results = pd.DataFrame(
-            dict(batch_indices=batch_indices, predictions=predictions)
+            dict(
+                batch_indices=batch_indices, predictions=predictions, img_file=img_files
+            )
         )
 
         results.to_csv(prediction_filepath, index=False)
@@ -61,3 +65,19 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
         }
         with open(prediction_hparams_filepath, "w") as hparams_file:
             yaml.dump(prediction_hparams, hparams_file)
+
+
+def validate_pred_datamodule(
+    datamodule: fingerspelling5.Fingerspelling5LandmarkDataModule,
+) -> None:
+    if datamodule.dataquality_file is not None:
+        raise ValueError(
+            "A dataquality file was provided. "
+            "There is no need in running metric computation only on good or bad data."
+        )
+
+    if datamodule.datasplit_file is not None:
+        raise ValueError(
+            "A datasplit file was provided. "
+            "There is no need in running metric computation only on good or bad data."
+        )
