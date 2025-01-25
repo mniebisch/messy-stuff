@@ -29,7 +29,7 @@ def get_latest_directory(base_path: pathlib.Path) -> pathlib.Path:
             f"No subdirectories found in the provided directory '{str(base_path)}'."
         )
 
-    latest_dir = max(subdirs, key=lambda d: d.name)
+    latest_dir = max(subdirs, key=lambda d: d.stat().st_ctime)
 
     return latest_dir
 
@@ -56,7 +56,7 @@ def get_latest_ckpt_file(base_path: pathlib.Path) -> pathlib.Path:
             f"No .ckpt files found in the provided directory '{base_path}'."
         )
 
-    latest_file = max(ckpt_files, key=lambda f: f.name)
+    latest_file = max(ckpt_files, key=lambda f: f.stat().st_ctime)
 
     return latest_file
 
