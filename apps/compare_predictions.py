@@ -3,10 +3,18 @@ import re
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
+import numpy as np
 import pandas as pd
+import plotly.express as px
 import yaml
+from numpy import typing as npt
+from sklearn import metrics as sk_metrics
 
 from fmp.datasets.fingerspelling5 import utils
+
+# https://plotly.com/python/parallel-categories-diagram/
+
+# TODO adapt dataclass of predicttion writer
 
 
 @dataclass
@@ -106,6 +114,71 @@ def map_predictions_to_letters(predictions: pd.Series) -> pd.Series:
     )
 
 
+def calc_metrics_letterwise(y_true: npt.NDArray, y_pred: npt.NDArray) -> pd.DataFrame:
+    labels = np.sort(np.unique(y_true))
+    recall_label = sk_metrics.recall_score(y_true, y_pred, average=None, labels=labels)
+    precision_label = sk_metrics.precision_score(
+        y_true, y_pred, average=None, labels=labels
+    )
+    f1_label = sk_metrics.f1_score(y_true, y_pred, average=None, labels=labels)
+
+    metrics_label = pd.DataFrame(
+        {
+            "recall": recall_label,
+            "precision": precision_label,
+            "f1": f1_label,
+            "label": labels,
+        }
+    )
+    metrics_label = pd.melt(metrics_label, id_vars=["label"])
+    return metrics_label
+
+
+def calc_metrics_agg(y_true: npt.NDArray, y_pred: npt.NDArray) -> pd.DataFrame:
+    recall_micro = sk_metrics.recall_score(y_true, y_pred, average="micro")
+    precision_micro = sk_metrics.precision_score(y_true, y_pred, average="micro")
+    f1_micro = sk_metrics.f1_score(y_true, y_pred, average="micro")
+    recall_macro = sk_metrics.recall_score(y_true, y_pred, average="macro")
+    precision_macro = sk_metrics.precision_score(y_true, y_pred, average="macro")
+    f1_macro = sk_metrics.f1_score(y_true, y_pred, average="macro")
+    accuracy = sk_metrics.accuracy_score(y_true, y_pred)
+
+    metrics_agg = pd.DataFrame(
+        {
+            "metric": [
+                "recall_micro",
+                "recall_macro",
+                "precision_micro",
+                "precision_macro",
+                "f1_micro",
+                "f1_macro",
+                "accuracy",
+            ],
+            "value": [
+                recall_micro,
+                recall_macro,
+                precision_micro,
+                precision_macro,
+                f1_micro,
+                f1_macro,
+                accuracy,
+            ],
+        }
+    )
+
+    return metrics_agg
+
+
+def create_prediction_id(
+    train_dir: str,
+    dataset_name: str,
+    training_id: str,
+    ckpt_epoch_num: int,
+    ckpt_step_num: int,
+) -> str:
+    return f"{train_dir}__{dataset_name}__{training_id}__epoch={ckpt_epoch_num}-step={ckpt_step_num}"
+
+
 def prepare_predictions(
     prediction_yaml: pathlib.Path, workspace_dir: pathlib.Path
 ) -> pd.DataFrame:
@@ -126,19 +199,59 @@ def prepare_predictions(
     prediction["ckpt_epoch_num"] = epoch_num
     prediction["ckpt_step_num"] = step_num
 
+    prediction["prediction_id"] = create_prediction_id(
+        train_dir, dataset_name, training_id, epoch_num, step_num
+    )
+
     prediction["predictions"] = map_predictions_to_letters(prediction["predictions"])
 
     return prediction
 
 
-if __name__ == "__main__":
-    workspace_dir = pathlib.Path(__file__).parent.parent
-    prediction_yaml = (
-        pathlib.Path(__file__).parent.parent
-        / "predictions"
-        / "example"
-        / "prediction__fingerspelling5_dummy__version_63__epoch=8-step=9.yaml"
+def compute_split_agg_metrics(prediction: pd.DataFrame) -> pd.DataFrame:
+    split_agg_metrics = (
+        prediction.groupby("split")
+        .apply(lambda x: calc_metrics_agg(x["predictions"], x["letter"]))
+        .reset_index(level=0)
     )
 
-    p = prepare_predictions(prediction_yaml, workspace_dir)
+    copying_cols = prediction[["split", "prediction_id"]].drop_duplicates()
+    split_agg_metrics = pd.merge(
+        split_agg_metrics, copying_cols, on="split", how="left"
+    )
+
+    return split_agg_metrics
+
+
+if __name__ == "__main__":
+    workspace_dir = pathlib.Path(__file__).parent.parent
+    prediction_yaml = [
+        (
+            pathlib.Path(__file__).parent.parent
+            / "predictions"
+            / "example"
+            / "prediction__fingerspelling5_dummy__version_63__epoch=8-step=9.yaml"
+        )
+    ]
+
+    prediction_data = [
+        prepare_predictions(prediction, workspace_dir) for prediction in prediction_yaml
+    ]
+    prediction_split_agg_metrics = [
+        compute_split_agg_metrics(prediction) for prediction in prediction_data
+    ]
+    prediction_split_agg_metrics = pd.concat(prediction_split_agg_metrics).reset_index(
+        drop=True
+    )
+
+    fig = px.bar(
+        prediction_split_agg_metrics,
+        x="metric",
+        y="value",
+        color="split",
+        facet_row="prediction_id",
+        barmode="group",
+    )
+    fig.show()
+
     print("Done")
