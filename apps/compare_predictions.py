@@ -1,8 +1,9 @@
 import pathlib
 import re
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
+import click
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -223,16 +224,22 @@ def compute_split_agg_metrics(prediction: pd.DataFrame) -> pd.DataFrame:
     return split_agg_metrics
 
 
-if __name__ == "__main__":
+@click.command()
+@click.option(
+    "--prediction-yaml",
+    "-p",
+    required=True,
+    multiple=True,
+    type=click.Path(
+        path_type=pathlib.Path,
+        exists=True,
+        resolve_path=True,
+        dir_okay=False,
+        file_okay=True,
+    ),
+)
+def main(prediction_yaml: List[pathlib.Path]) -> None:
     workspace_dir = pathlib.Path(__file__).parent.parent
-    prediction_yaml = [
-        (
-            pathlib.Path(__file__).parent.parent
-            / "predictions"
-            / "example"
-            / "prediction__fingerspelling5_dummy__version_63__epoch=8-step=9.yaml"
-        )
-    ]
 
     prediction_data = [
         prepare_predictions(prediction, workspace_dir) for prediction in prediction_yaml
@@ -254,4 +261,6 @@ if __name__ == "__main__":
     )
     fig.show()
 
-    print("Done")
+
+if __name__ == "__main__":
+    main()
