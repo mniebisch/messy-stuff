@@ -28,7 +28,8 @@ def create_dataset(
             str(num_persons),
             "--num-samples",
             str(num_samples),
-        ]
+        ],
+        check=True,
     )
 
 
@@ -45,7 +46,8 @@ def create_datasplits(data_path: pathlib.Path, dataset_name: str) -> None:
             str(scripts_file),
             "--dataset-dir",
             str(dataset_path),
-        ]
+        ],
+        check=True,
     )
 
 
@@ -62,7 +64,8 @@ def create_random_dataquality_file(data_path: pathlib.Path, dataset_name: str) -
             str(scripts_file),
             "--dataset-dir",
             str(dataset_path),
-        ]
+        ],
+        check=True,
     )
 
 
@@ -79,7 +82,8 @@ def create_random_images(data_path: pathlib.Path, csv_file: pathlib.Path) -> Non
             str(data_path),
             "--csv-path",
             str(csv_file),
-        ]
+        ],
+        check=True,
     )
 
 

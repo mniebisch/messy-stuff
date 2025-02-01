@@ -70,7 +70,8 @@ def train(train_config: pathlib.Path) -> None:
             "fit",
             "--config",
             str(train_config),
-        ]
+        ],
+        check=True,
     )
 
 
@@ -91,7 +92,8 @@ def predict(
             str(predict_config),
             "--ckpt_path",
             str(ckpt_path),
-        ]
+        ],
+        check=True,
     )
 
 

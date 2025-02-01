@@ -58,7 +58,8 @@ def compute_metrics(
             str(metrics_output_path),
             "--data.dataset_dir",
             str(dataset_path),
-        ]
+        ],
+        check=True,
     )
 
 
