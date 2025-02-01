@@ -18,10 +18,12 @@ from fmp.datasets.fingerspelling5 import utils
 # TODO adapt dataclass of predicttion writer
 
 
+# ATTENTION coupling with creation of yaml file in prediction writer
 @dataclass
 class PredictionsYAML:
     ckpt: pathlib.Path
     prediction_output: pathlib.Path
+    dataset_dir: pathlib.Path
 
 
 def load_predictions(
@@ -37,8 +39,9 @@ def load_predictions_yaml(
         hparams = yaml.safe_load(hparams_file)
 
     return PredictionsYAML(
-        ckpt=workspace_dir / hparams["ckpt"],
-        prediction_output=workspace_dir / hparams["prediction_output"],
+        ckpt=pathlib.Path(hparams["ckpt"]),
+        prediction_output=pathlib.Path(hparams["prediction_output"]),
+        dataset_dir=pathlib.Path(hparams["dataset_dir"]),
     )
 
 
@@ -189,7 +192,17 @@ def prepare_predictions(
     datasplit = load_training_datasplit(prediction_hparams, workspace_dir)
     predictions = load_predictions(prediction_hparams, workspace_dir)
 
-    prediction = pd.merge(datasplit, predictions, on="img_file", validate="1:1")
+    # get split from datasplit
+    train_dataset = pathlib.Path(train_config["data"]["init_args"]["dataset_dir"])
+    prediction_dataset = prediction_hparams.dataset_dir
+    if train_dataset == prediction_dataset:
+        prediction = pd.merge(
+            datasplit[["img_file", "split"]], predictions, on="img_file", validate="1:1"
+        )
+    else:
+        prediction = predictions
+        prediction["split"] = "test"
+
     train_dir, dataset_name, training_id, epoch_num, step_num = extract_info_from_path(
         prediction_yaml
     )

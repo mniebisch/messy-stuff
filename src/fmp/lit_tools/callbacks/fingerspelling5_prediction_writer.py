@@ -37,9 +37,7 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
         ckpt_path = pathlib.Path(trainer.ckpt_path)
         ckpt_name = ckpt_path.stem
         ckpt_version = ckpt_path.parts[-3]
-        datamodule: fingerspelling5.Fingerspelling5LandmarkDataModule = (
-            trainer.datamodule
-        )
+        datamodule = trainer.datamodule
         dataset_name = pathlib.Path(datamodule.dataset_dir).name
         prediction_name = f"prediction__{dataset_name}__{ckpt_version}__{ckpt_name}"
         prediction_filename = prediction_name + ".csv"
@@ -49,11 +47,25 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
         predictions = torch.concat(predictions)
         batch_indices = np.concatenate([bi for bi in batch_indices[0]], dtype=int)
         # TODO Attention! won't work for vision dataset
-        img_files = trainer.datamodule.predict_data._landmark_data["img_file"]
+        if isinstance(datamodule, fingerspelling5.Fingerspelling5LandmarkDataModule):
+            img_files = datamodule.predict_data._landmark_data["img_file"]
+            # do you really want that? I guess something like a table with the following columns:
+            # would be more useful: img_file, person, letter
+            # TODO write abstraction for your datasets!!!!!!!!!1
+            person = datamodule.predict_data._landmark_data["person"]
+            letter = datamodule.predict_data._landmark_data["letter"]
+        elif isinstance(datamodule, fingerspelling5.Fingerspelling5ImageDataModule):
+            img_files = datamodule.predict_data.file_data["img_file"]
+        else:
+            raise ValueError("Unknown datamodule type.")
 
         results = pd.DataFrame(
             dict(
-                batch_indices=batch_indices, predictions=predictions, img_file=img_files
+                batch_indices=batch_indices,
+                predictions=predictions,
+                img_file=img_files,
+                person=person,
+                letter=letter,
             )
         )
 
@@ -62,6 +74,7 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
         prediction_hparams = {
             "ckpt": str(ckpt_path),
             "prediction_output": str(prediction_filepath),
+            "dataset_dir": datamodule.dataset_dir,
         }
         with open(prediction_hparams_filepath, "w") as hparams_file:
             yaml.dump(prediction_hparams, hparams_file)
@@ -70,11 +83,11 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
 def validate_pred_datamodule(
     datamodule: fingerspelling5.Fingerspelling5LandmarkDataModule,
 ) -> None:
-    if datamodule.dataquality_file is not None:
-        raise ValueError(
-            "A dataquality file was provided. "
-            "There is no need in running metric computation only on good or bad data."
-        )
+    # if datamodule.dataquality_file is not None:
+    #     raise ValueError(
+    #         "A dataquality file was provided. "
+    #         "There is no need in running metric computation only on good or bad data."
+    #     )
 
     if datamodule.datasplit_file is not None:
         raise ValueError(
