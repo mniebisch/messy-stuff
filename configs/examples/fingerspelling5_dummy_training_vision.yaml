@@ -13,9 +13,13 @@ trainer:
       name: examples
       log_graph: true
 model:
-  class_path: fmp.models.ResNet18Classifier
+  class_path: fmp.models.ResNetClassifier
   init_args:
-    num_classes: 24
+    model:
+      class_path: fmp.models.ResNet18
+      init_args:
+        num_classes: 24
+
 data:
   class_path: fmp.datasets.fingerspelling5.Fingerspelling5ImageDataModule
   init_args:

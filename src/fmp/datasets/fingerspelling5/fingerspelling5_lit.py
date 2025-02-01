@@ -248,7 +248,9 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         # TODO add validation if required
         # TODO maybe find better name than datasplit file? predict case!?
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(
+            ignore=["train_transforms", "valid_transforms", "predict_transforms"]
+        )
 
         self.images_data_dir = images_data_dir
         self.batch_size = batch_size

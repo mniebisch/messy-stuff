@@ -6,21 +6,18 @@ import torch.nn as nn
 import torchvision.models as models
 from torch.nn import functional as F
 
-__all__ = ["ResNet18Classifier"]
+__all__ = ["ResNetClassifier"]
 
 
-class ResNet18Classifier(L.LightningModule):
-    def __init__(self, num_classes: int):
-        super(ResNet18Classifier, self).__init__()
-        self.save_hyperparameters()
+class ResNetClassifier(L.LightningModule):
+    def __init__(self, model: nn.Module):
+        super(ResNetClassifier, self).__init__()
+        # self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["model"])
 
         self.example_input_array = torch.rand(1, 3, 224, 224)
 
-        # Load a pre-trained ResNet-18 model
-        self.model = models.resnet18(pretrained=True)
-
-        # Modify the final fully connected layer to match the number of classes
-        self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
+        self.model = model
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
