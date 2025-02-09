@@ -9,8 +9,8 @@ trainer:
   logger:
     class_path: lightning.pytorch.loggers.TensorBoardLogger
     init_args:
-      save_dir: ./logs
-      name: examples
+      save_dir: ./logs/examples
+      name: vision_dummy
       log_graph: true
 model:
   class_path: fmp.models.ResNetClassifier
@@ -23,8 +23,9 @@ model:
 data:
   class_path: fmp.datasets.fingerspelling5.Fingerspelling5ImageDataModule
   init_args:
-    datasplit_file: ./data/fingerspelling5/fingerspelling5_dummy/split_00_fingerspelling5_dummy.csv
+    dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
     images_data_dir: ../../data/
+    datasplit_file: ./data/fingerspelling5/fingerspelling5_dummy/split_00_fingerspelling5_dummy.csv
     dataquality_file: ./data/fingerspelling5/fingerspelling5_dummy/fingerspelling5_dummy__data_quality.csv
     batch_size: 64
     num_dataloader_workers: 23

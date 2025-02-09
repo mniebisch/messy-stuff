@@ -38,7 +38,7 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
         ckpt_name = ckpt_path.stem
         ckpt_version = ckpt_path.parts[-3]
         datamodule = trainer.datamodule
-        dataset_name = pathlib.Path(datamodule.dataset_dir).name
+        dataset_name = datamodule.dataset_name
         prediction_name = f"prediction__{dataset_name}__{ckpt_version}__{ckpt_name}"
         prediction_filename = prediction_name + ".csv"
         prediction_filepath = self.output_dir / prediction_filename
@@ -56,6 +56,8 @@ class Fingerspelling5PredictionWriter(BasePredictionWriter):
             letter = datamodule.predict_data._landmark_data["letter"]
         elif isinstance(datamodule, fingerspelling5.Fingerspelling5ImageDataModule):
             img_files = datamodule.predict_data.file_data["img_file"]
+            person = datamodule.predict_data.file_data["person"]
+            letter = datamodule.predict_data.file_data["letter"]
         else:
             raise ValueError("Unknown datamodule type.")
 

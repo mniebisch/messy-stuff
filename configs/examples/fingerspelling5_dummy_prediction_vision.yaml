@@ -4,18 +4,15 @@ trainer:
     - class_path: fmp.lit_tools.callbacks.Fingerspelling5PredictionWriter
       init_args:
         write_interval: epoch
-        output_dir: ./predictions/example/landmark_dummy
+        output_dir: ./predictions/example/vision_dummy
   logger: null
 data:
-  class_path: fmp.datasets.fingerspelling5.Fingerspelling5LandmarkDataModule
+  class_path: fmp.datasets.fingerspelling5.Fingerspelling5ImageDataModule
   init_args:
     dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
+    images_data_dir: ../../data/
     datasplit_file: null
     dataquality_file: null
-    batch_size: 128
-    predict_transforms:
-      class_path: torch_geometric.transforms.Compose
-      init_args:
-        transforms:
-          - class_path: torch_geometric.transforms.NormalizeScale
+    batch_size: 64
+    predict_transforms: null
 return_predictions: False

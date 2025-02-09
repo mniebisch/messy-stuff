@@ -37,6 +37,7 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         self.predict_transforms = predict_transforms
         self.datasplit_file = datasplit_file
         self.dataquality_file = dataquality_file
+        self.dataset_name = pathlib.Path(dataset_dir).name
 
         self.fingerspelling5_csv = self.get_data_filename()
         self.validate_dataset_dir()
@@ -60,9 +61,10 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
                 self.fingerspelling5_csv, filter_nans=filter_nans
             )
 
-            self.validate_datasplit_data(landmark_data)
+            split_data = pd.read_csv(self.datasplit_file)
+            validate_datasplit_data(landmark_data, split_data)
             # hm, can split file change between these line?
-            train_index, val_index = self.load_datasplit_indices()
+            train_index, val_index = load_datasplit_indices(split_data)
 
             if self.dataquality_file is not None:
                 self.validate_dataquality_data(landmark_data)
@@ -170,35 +172,6 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
         if not pathlib.Path(datasplit_file).exists():
             raise ValueError(f"Invalid datasplit file '{datasplit_file}'.")
 
-    def validate_datasplit_data(self, landmark_data: pd.DataFrame) -> None:
-        split_data = pd.read_csv(self.datasplit_file)
-
-        if len(split_data) != len(landmark_data):
-            raise ValueError("Landmark data and split data are not of same length.")
-
-        if not all(landmark_data["img_file"] == split_data["img_file"]):
-            raise ValueError(
-                "Sources for landmark data and split data are not the same or "
-                "the order has changed."
-            )
-
-        if (
-            "train" not in split_data["split"].values
-            or "valid" not in split_data["split"].values
-        ):
-            raise ValueError(
-                "Expect the split identifiers 'train' and 'split' but didn't found them."
-            )
-        # check if other elements than 'train' or 'valid' are in split col?
-
-    def load_datasplit_indices(self) -> Tuple[npt.NDArray, npt.NDArray]:
-        split_data = pd.read_csv(self.datasplit_file)
-
-        train_indices = split_data["split"] == "train"
-        valid_indices = split_data["split"] == "valid"
-
-        return train_indices.values, valid_indices.values
-
     def extract_dataset_name(self) -> str:
         dataset_path = pathlib.Path(self.dataset_dir)
         return dataset_path.name
@@ -236,13 +209,14 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
 class Fingerspelling5ImageDataModule(L.LightningDataModule):
     def __init__(
         self,
-        datasplit_file: str,
+        dataset_dir: str,
         images_data_dir: str,
         batch_size: int,
         num_dataloader_workers: int = 0,
         train_transforms: Optional[v2.Transform] = None,
         valid_transforms: Optional[v2.Transform] = None,
         predict_transforms: Optional[v2.Transform] = None,
+        datasplit_file: Optional[str] = None,
         dataquality_file: Optional[str] = None,
     ) -> None:
         # TODO add validation if required
@@ -252,6 +226,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
             ignore=["train_transforms", "valid_transforms", "predict_transforms"]
         )
 
+        self.dataset_dir = dataset_dir
         self.images_data_dir = images_data_dir
         self.batch_size = batch_size
         self.num_dataloader_workers = num_dataloader_workers
@@ -260,13 +235,21 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         self.predict_transforms = predict_transforms
         self.datasplit_file = datasplit_file
         self.dataquality_file = dataquality_file
+        self.dataset_name = pathlib.Path(dataset_dir).name
+
+        self.image_files_csv = self.get_image_files_csv()
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
-            fingerspelling5_data = pd.read_csv(self.datasplit_file)
-
-            train_index = fingerspelling5_data["split"] == "train"
-            valid_index = fingerspelling5_data["split"] == "valid"
+            fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
+            if self.datasplit_file is None:
+                raise ValueError(
+                    "Fit without 'datasplit_file' not possible. "
+                    "Please provide 'datasplit_file'."
+                )
+            split_data = pd.read_csv(self.datasplit_file)
+            validate_datasplit_data(fingerspelling5_image_files, split_data)
+            train_index, valid_index = load_datasplit_indices(split_data)
 
             if self.dataquality_file is not None:
                 dataquality_data = pd.read_csv(self.dataquality_file)
@@ -275,8 +258,12 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 train_index = train_index & ~quality_indices.values
                 valid_index = valid_index & ~quality_indices.values
 
-            train_data = fingerspelling5_data.loc[train_index].reset_index(drop=True)
-            valid_data = fingerspelling5_data.loc[valid_index].reset_index(drop=True)
+            train_data = fingerspelling5_image_files.loc[train_index].reset_index(
+                drop=True
+            )
+            valid_data = fingerspelling5_image_files.loc[valid_index].reset_index(
+                drop=True
+            )
 
             self.train_data = fingerspelling5.Fingerspelling5Image(
                 train_data,
@@ -300,10 +287,10 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         elif stage == "test":
             pass
         elif stage == "predict":
-            fingerspelling5_data = pd.read_csv(self.datasplit_file)
+            fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
 
             self.predict_data = fingerspelling5.Fingerspelling5Image(
-                fingerspelling5_data,
+                fingerspelling5_image_files,
                 pathlib.Path(self.images_data_dir),
                 transforms=self.predict_transforms,
             )
@@ -351,6 +338,10 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
             num_workers=self.num_dataloader_workers,
         )
 
+    def get_image_files_csv(self) -> pathlib.Path:
+        dataset_path = pathlib.Path(self.dataset_dir)
+        return dataset_path / "image_files.csv"
+
 
 def _extract_data_csv_files(data_dir: pathlib.Path) -> List[pathlib.Path]:
     return [
@@ -359,3 +350,32 @@ def _extract_data_csv_files(data_dir: pathlib.Path) -> List[pathlib.Path]:
         if file.name.casefold().endswith(".csv")
         and not file.name.casefold().startswith("split_")
     ]
+
+
+def load_datasplit_indices(split_data) -> Tuple[npt.NDArray, npt.NDArray]:
+    train_indices = split_data["split"] == "train"
+    valid_indices = split_data["split"] == "valid"
+
+    return train_indices.values, valid_indices.values
+
+
+def validate_datasplit_data(
+    landmark_data: pd.DataFrame, split_data: pd.DataFrame
+) -> None:
+    if len(split_data) != len(landmark_data):
+        raise ValueError("Landmark data and split data are not of same length.")
+
+    if not all(landmark_data["img_file"] == split_data["img_file"]):
+        raise ValueError(
+            "Sources for landmark data and split data are not the same or "
+            "the order has changed."
+        )
+
+    if (
+        "train" not in split_data["split"].values
+        or "valid" not in split_data["split"].values
+    ):
+        raise ValueError(
+            "Expect the split identifiers 'train' and 'split' but didn't found them."
+        )
+    # check if other elements than 'train' or 'valid' are in split col?

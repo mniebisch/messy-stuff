@@ -10,8 +10,8 @@ trainer:
   logger:
     class_path: lightning.pytorch.loggers.TensorBoardLogger
     init_args:
-      save_dir: ./logs
-      name: examples
+      save_dir: ./logs/examples
+      name: landmark_dummy
       log_graph: true
 model:
   class_path: fmp.models.SingleLayerMLP

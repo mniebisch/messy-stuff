@@ -1,7 +1,6 @@
 import pathlib
 from typing import Optional, Tuple, Union
 
-import albumentations as A
 import cv2
 import numpy as np
 import pandas as pd
@@ -103,7 +102,7 @@ class Fingerspelling5Image(Dataset):
         self,
         file_data: pd.DataFrame,
         dataset_path: pathlib.Path,
-        transforms: Optional[Union[A.BaseCompose, A.BasicTransform]] = None,
+        transforms=None,
         split: Optional[str] = None,
     ) -> None:
         self.split = split
