@@ -41,6 +41,16 @@ def combine_data_directory_with_files(
     return combined_paths
 
 
+def store_image_files_overview(csv_path: Path) -> None:
+    landmark_data = pd.read_csv(csv_path)
+    image_files_overview = landmark_data.loc[
+        :, ["letter", "person", "img_file"]
+    ].reset_index(drop=True)
+    dataset_dir = Path(csv_path).parent
+    image_files_file = dataset_dir / "image_files.csv"
+    image_files_overview.to_csv(image_files_file, index=False)
+
+
 @click.command()
 @click.option(
     "--data-directory",
@@ -61,6 +71,8 @@ def main(data_directory: Path, csv_path: Path):
 
     # Generate and save random images to the specified paths
     generate_and_save_random_images(combined_paths, 64, 64)
+
+    store_image_files_overview(csv_path)
 
 
 if __name__ == "__main__":
