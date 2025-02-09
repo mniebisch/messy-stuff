@@ -3,7 +3,6 @@ from typing import Tuple
 import lightning as L
 import torch
 import torch.nn as nn
-import torchvision.models as models
 from torch.nn import functional as F
 
 __all__ = ["ResNetClassifier"]
