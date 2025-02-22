@@ -124,7 +124,7 @@
             "justMyCode": false
         },
         {
-            "name": "Train Landmarks [Dummy]",
+            "name": "Train [Landmark] [Dummy]",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
@@ -137,7 +137,7 @@
             "justMyCode": false
         },
         {
-            "name": "Train Vision [Dummy]",
+            "name": "Train [Vision] [Dummy]",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
@@ -150,18 +150,35 @@
             "justMyCode": false
         },
         {
-            "name": "Predictions [Dummy]",
+            "name": "Predictions [Landmark] [Dummy]",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
             "args": [
                 "predict",
                 "--config",
-                "logs/examples/version_0/config.yaml",
+                "logs/examples/version_61/config.yaml",
                 "--config",
                 "configs/examples/fingerspelling5_dummy_prediction.yaml",
                 "--ckpt_path",
-                "logs/examples/version_0/checkpoints/epoch=8-step=9.ckpt"
+                "logs/examples/version_61/checkpoints/epoch=8-step=9.ckpt"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Predictions [Vision] [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
+            "args": [
+                "predict",
+                "--config",
+                "logs/examples/vision_dummy/version_0/config.yaml",
+                "--config",
+                "configs/examples/fingerspelling5_dummy_prediction_vision.yaml",
+                "--ckpt_path",
+                "logs/examples/vision_dummy/version_0/checkpoints/epoch=5-step=12.ckpt"
             ],
             "console": "integratedTerminal",
             "justMyCode": false
@@ -189,7 +206,7 @@
             "justMyCode": false
         },
         {
-            "name": "Train eval pipeline [Dummy]",
+            "name": "Train eval pipeline [Landmark] [Dummy]",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/pipelines/fingerspelling5/train_eval.py",
@@ -198,6 +215,20 @@
                 "configs/examples/fingerspelling5_dummy_training.yaml",
                 "--predict-config",
                 "configs/examples/fingerspelling5_dummy_prediction.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Train eval pipeline [Vision] [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/pipelines/fingerspelling5/train_eval.py",
+            "args": [
+                "--train-config",
+                "configs/examples/fingerspelling5_dummy_training_vision.yaml",
+                "--predict-config",
+                "configs/examples/fingerspelling5_dummy_prediction_vision.yaml"
             ],
             "console": "integratedTerminal",
             "justMyCode": false
@@ -226,6 +257,48 @@
                 "../../data/",
                 "--csv-path",
                 "data/fingerspelling5/fingerspelling5_dummy/fingerspelling5_dummy.csv",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Compare Predictions [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/apps/compare_predictions.py",
+            "args": [
+                "-p",
+                "predictions/example/prediction__fingerspelling5_dummy__version_63__epoch=8-step=9.yaml",
+                "-p",
+                "predictions/example/prediction__fingerspelling5_dummy__version_62__epoch=8-step=9.yaml",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Train eval pipeline [Landmark]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/pipelines/fingerspelling5/train_eval.py",
+            "args": [
+                "--train-config",
+                "configs/fingerspelling5_singlehands/train_mlp.yaml",
+                "--predict-config",
+                "configs/fingerspelling5_singlehands/predict_mlp.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Compare Predictions [Landmar]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/apps/compare_predictions.py",
+            "args": [
+                "-p",
+                "predictions/fingerspelling5_mlp/prediction__fingerspelling5_singlehands_sorted__version_1__epoch=59-step=41640.yaml",
+                "-p",
+                "predictions/fingerspelling5_mlp/prediction__fingerspelling5_singlehands_micha_sorted__version_1__epoch=59-step=41640.yaml",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
