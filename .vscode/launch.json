@@ -303,5 +303,23 @@
             "console": "integratedTerminal",
             "justMyCode": false
         },
+        {
+            "name": "Create Dataset Subset [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/create_fingerspelling_training_subset.py",
+            "args": [
+                "--dataset-dir",
+                "data/fingerspelling5/fingerspelling5_dummy",
+                "--letters",
+                "c",
+                "--letters",
+                "l",
+                "--letters",
+                "y",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
     ]
 }
