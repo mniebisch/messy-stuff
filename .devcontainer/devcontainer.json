@@ -1,5 +1,9 @@
 {
-    "build": {"context": "..", "dockerfile": "../Dockerfile", "target": "devcontainer"},
+    "build": {
+        "context": "..",
+        "dockerfile": "../Dockerfile_huggingface"
+        // "target": "devcontainer"
+    },
     "customizations": {
         "vscode": {
             "extensions": [
@@ -16,5 +20,29 @@
     "features": {
         "ghcr.io/devcontainers/features/git:1": {}
     },
-    "postCreateCommand": "pip install -e . --no-deps"
+    "runArgs": [
+        "--gpus=all",
+        "--shm-size=8g"
+    ],
+    "forwardPorts": [
+        8050
+    ],
+    "portsAttributes": {
+        "8050": {
+            "label": "Dash",
+            "onAutoForward": "openBrowser" // optional: open browser automatically
+        }
+    },
+    "postCreateCommand": "pip install -e . --no-deps",
+    "remoteUser": "diffuser",
+    "mounts": [
+        "source=${localEnv:HOME}/.cache/huggingface/hub,target=/mnt/huggingface/hub,type=bind",
+        "source=${localEnv:HOME}/data,target=/mnt/data,type=bind"
+    ],
+    "containerEnv": {
+        "HF_HUB_CACHE": "/mnt/huggingface/hub"
+    },
+    "remoteEnv": {
+        "HF_HUB_CACHE": "/mnt/huggingface/hub"
+    }
 }
