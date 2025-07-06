@@ -1,9 +1,11 @@
 import pathlib
 import warnings
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
+import kornia as K
 import lightning as L
 import pandas as pd
+from kornia.augmentation.base import _AugmentationBase
 from numpy import typing as npt
 from torch.utils import data as torch_data
 from torch_geometric.transforms import BaseTransform
@@ -214,6 +216,12 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         batch_size: int,
         num_dataloader_workers: int = 0,
         train_transforms: Optional[v2.Transform] = None,
+        kornia_train_transforms: Optional[List[_AugmentationBase]] = None,
+        kornia_train_transform_kwargs: Optional[Dict[str, Any]] = None,
+        kornia_valid_transform_kwargs: Optional[Dict[str, Any]] = None,
+        kornia_predict_transform_kwargs: Optional[Dict[str, Any]] = None,
+        kornia_valid_transforms: Optional[List[_AugmentationBase]] = None,
+        kornia_predict_transforms: Optional[List[_AugmentationBase]] = None,
         valid_transforms: Optional[v2.Transform] = None,
         predict_transforms: Optional[v2.Transform] = None,
         datasplit_file: Optional[str] = None,
@@ -233,6 +241,44 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         self.train_transforms = train_transforms
         self.valid_transforms = valid_transforms
         self.predict_transforms = predict_transforms
+
+        kornia_train_transform_kwargs = (
+            {}
+            if kornia_train_transform_kwargs is None
+            else kornia_train_transform_kwargs
+        )
+        kornia_valid_transform_kwargs = (
+            {}
+            if kornia_valid_transform_kwargs is None
+            else kornia_valid_transform_kwargs
+        )
+        kornia_predict_transform_kwargs = (
+            {}
+            if kornia_predict_transform_kwargs is None
+            else kornia_predict_transform_kwargs
+        )
+        self.kornia_train_transforms = (
+            K.augmentation.AugmentationSequential(
+                *kornia_train_transforms, **kornia_train_transform_kwargs
+            )
+            if kornia_train_transforms
+            else None
+        )
+        self.kornia_valid_transforms = (
+            K.augmentation.AugmentationSequential(
+                *kornia_valid_transforms, **kornia_valid_transform_kwargs
+            )
+            if kornia_valid_transforms
+            else None
+        )
+        self.kornia_predict_transforms = (
+            K.augmentation.AugmentationSequential(
+                *kornia_predict_transforms, **kornia_predict_transform_kwargs
+            )
+            if kornia_predict_transforms
+            else None
+        )
+
         self.datasplit_file = datasplit_file
         self.dataquality_file = dataquality_file
         self.dataset_name = pathlib.Path(dataset_dir).name
@@ -268,7 +314,59 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
             self.train_data = fingerspelling5.Fingerspelling5Image(
                 train_data,
                 pathlib.Path(self.images_data_dir),
-                transforms=self.train_transforms,
+                tv_transforms=self.train_transforms,
+                kornia_transforms=self.kornia_train_transforms,
+            )
+
+            self.valid_train_data = fingerspelling5.Fingerspelling5Image(
+                train_data,
+                pathlib.Path(self.images_data_dir),
+                tv_transforms=self.valid_transforms,
+                kornia_transforms=self.kornia_valid_transforms,
+                split="train",
+            )
+
+            self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
+                valid_data,
+                pathlib.Path(self.images_data_dir),
+                tv_transforms=self.valid_transforms,
+                kornia_transforms=self.kornia_valid_transforms,
+                split="valid",
+            )
+        elif stage == "test":
+            pass
+        elif stage == "predict":
+            fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
+
+            self.predict_data = fingerspelling5.Fingerspelling5Image(
+                fingerspelling5_image_files,
+                pathlib.Path(self.images_data_dir),
+                tv_transforms=self.predict_transforms,
+                kornia_transforms=self.kornia_predict_transforms,
+            )
+        elif stage == "validate":
+            fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
+            if self.datasplit_file is None:
+                raise ValueError(
+                    "Fit without 'datasplit_file' not possible. "
+                    "Please provide 'datasplit_file'."
+                )
+            split_data = pd.read_csv(self.datasplit_file)
+            validate_datasplit_data(fingerspelling5_image_files, split_data)
+            train_index, valid_index = load_datasplit_indices(split_data)
+
+            if self.dataquality_file is not None:
+                dataquality_data = pd.read_csv(self.dataquality_file)
+                quality_indices = dataquality_data["is_corrupted"]
+
+                train_index = train_index & ~quality_indices.values
+                valid_index = valid_index & ~quality_indices.values
+
+            train_data = fingerspelling5_image_files.loc[train_index].reset_index(
+                drop=True
+            )
+            valid_data = fingerspelling5_image_files.loc[valid_index].reset_index(
+                drop=True
             )
 
             self.valid_train_data = fingerspelling5.Fingerspelling5Image(
@@ -284,16 +382,6 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 transforms=self.valid_transforms,
                 split="valid",
             )
-        elif stage == "test":
-            pass
-        elif stage == "predict":
-            fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
-
-            self.predict_data = fingerspelling5.Fingerspelling5Image(
-                fingerspelling5_image_files,
-                pathlib.Path(self.images_data_dir),
-                transforms=self.predict_transforms,
-            )
         else:
             pass
 
@@ -307,6 +395,9 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
             shuffle=True,
             drop_last=True,
             num_workers=self.num_dataloader_workers,
+            persistent_workers=True,
+            pin_memory=True,
+            # prefetch_factor=1,
         )
 
     def val_dataloader(self) -> List[torch_data.DataLoader]:

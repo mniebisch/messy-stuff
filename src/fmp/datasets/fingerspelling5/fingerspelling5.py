@@ -1,18 +1,16 @@
 import pathlib
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
-import cv2
+import kornia as K
 import numpy as np
 import pandas as pd
 import torch
-from PIL import Image
 from torch.utils.data import Dataset
-from torchvision import tv_tensors
 from torchvision.transforms import v2
 
 from . import utils
 
-__all__ = ["Fingerspelling5Image", "Fingerspelling5Landmark"]
+__all__ = ["Fingerspelling5Image", "Fingerspelling5Landmark", "setup_transforms"]
 
 
 class Fingerspelling5Landmark(Dataset):
@@ -102,7 +100,8 @@ class Fingerspelling5Image(Dataset):
         self,
         file_data: pd.DataFrame,
         dataset_path: pathlib.Path,
-        transforms=None,
+        tv_transforms: Optional[v2.Transform] = None,
+        kornia_transforms: Optional[K.augmentation.AugmentationSequential] = None,
         split: Optional[str] = None,
     ) -> None:
         self.split = split
@@ -113,7 +112,9 @@ class Fingerspelling5Image(Dataset):
 
         self._label_transforms = self._setup_label_transforms()
 
-        self.transforms = self._setup_transforms(transforms)
+        self.tv_transforms = tv_transforms
+        self.kornia_transforms = kornia_transforms
+
         self.file_data = file_data
         self.dataset_path = dataset_path
 
@@ -125,13 +126,29 @@ class Fingerspelling5Image(Dataset):
         image_file = sample["img_file"]
         label = sample["letter"]
 
-        image = cv2.imread(self.dataset_path / image_file)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = Image.fromarray(image)
-        image = tv_tensors.Image(image)
+        if self.tv_transforms is not None:
+            desired_type = K.io.ImageLoadType.RGB8
+        else:
+            desired_type = K.io.ImageLoadType.RGB32
 
-        if self.transforms is not None:
-            image = self.transforms(image)
+        image = K.io.load_image(
+            self.dataset_path / image_file,
+            desired_type=desired_type,
+            device="cpu",
+        )
+
+        # it is expected that tv transforms contain
+        # v2.ToImage()
+        # at the beginning
+        # and
+        # v2.ToDtype(torch.float32, scale=True)
+        # v2.ToPureTensor()
+        # at the end
+        if self.tv_transforms is not None:
+            image = self.tv_transforms(image)
+
+        if self.kornia_transforms is not None:
+            image = self.kornia_transforms(image)
 
         label = self._label_transforms(self.letters.index(label))
 
@@ -146,14 +163,12 @@ class Fingerspelling5Image(Dataset):
             ]
         )
 
-    def _setup_transforms(
-        self, transforms: Optional[v2.Transform] = None
-    ) -> v2.Compose:
-        conversion = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
-        # normalize = v2.Normalize() # TODO extract params from dataset
-        if transforms is None:
-            transforms = conversion
-        else:
-            transforms = v2.Compose([transforms, conversion])
 
-        return transforms
+def setup_transforms(transforms: Optional[v2.Transform] = None) -> v2.Compose:
+    conversion = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
+    if transforms is None:
+        transforms = conversion
+    else:
+        transforms = v2.Compose([transforms, conversion])
+
+    return transforms

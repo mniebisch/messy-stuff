@@ -14,7 +14,7 @@ FROM pytorch/pytorch:2.7.0-cuda11.8-cudnn9-runtime
 
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git \
+    git \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ————————————————————————————————————————
@@ -23,27 +23,43 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #    ② diffusers ecosystem
 # ————————————————————————————————————————
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir \
-      --index-url https://download.pytorch.org/whl/cu118 \
-      torch==2.7.0+cu118 \
-      torchvision==0.22.0+cu118 \
-      torchaudio==2.7.0+cu118
+    && pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cu118 \
+    torch==2.7.0+cu118 \
+    torchvision==0.22.0+cu118 \
+    torchaudio==2.7.0+cu118
 
 ###############################################################################
 # step 2: diffusion stack (no xformers) from the normal PyPI index            #
 ###############################################################################
 RUN pip install --no-cache-dir \
-      git+https://github.com/huggingface/diffusers.git@8e7d6c0 \
-      transformers==4.52.2 \
-      accelerate==0.30.1 \
-      safetensors==0.4.3 \
-      sentencepiece==0.2.0 \
-      protobuf==4.25.3 \
-      scipy==1.13.0 \
-      "pillow>=10.2" \
-      tqdm psutil \
- && pip cache purge
+    git+https://github.com/huggingface/diffusers.git@8e7d6c0 \
+    transformers==4.52.2 \
+    accelerate==0.30.1 \
+    safetensors==0.4.3 \
+    sentencepiece==0.2.0 \
+    protobuf==4.25.3 \
+    scipy==1.13.0 \
+    "pillow>=10.2" \
+    tqdm psutil \
+    && pip cache purge
 
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    g++  build-essential  libjpeg-turbo8-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    git+https://github.com/xinntao/BasicSR.git@master \
+    git+https://github.com/xinntao/Real-ESRGAN.git@master \
+    # force headless OpenCV *after* all other deps
+    opencv-python-headless==4.10.0.82 \
+    facexlib==0.3.0 \
+    # … rest of your list …
+    && pip cache purge
+
+RUN pip uninstall -y opencv-python opencv-python-headless \
+    && pip install --no-cache-dir opencv-python-headless==4.11.0.86
 # ————————————————————————————————————————
 # 3. Disable Accelerate telemetry (optional)
 # ————————————————————————————————————————
