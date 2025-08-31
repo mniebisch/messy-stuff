@@ -5,12 +5,18 @@ import kornia as K
 import numpy as np
 import pandas as pd
 import torch
+from numpy import typing as npt
 from torch.utils.data import Dataset
 from torchvision.transforms import v2
 
 from . import utils
 
-__all__ = ["Fingerspelling5Image", "Fingerspelling5Landmark", "setup_transforms"]
+__all__ = [
+    "Fingerspelling5Image",
+    "Fingerspelling5ImageInmemory",
+    "Fingerspelling5Landmark",
+    "setup_transforms",
+]
 
 
 class Fingerspelling5Landmark(Dataset):
@@ -136,6 +142,65 @@ class Fingerspelling5Image(Dataset):
             desired_type=desired_type,
             device="cpu",
         )
+
+        # it is expected that tv transforms contain
+        # v2.ToImage()
+        # at the beginning
+        # and
+        # v2.ToDtype(torch.float32, scale=True)
+        # v2.ToPureTensor()
+        # at the end
+        if self.tv_transforms is not None:
+            image = self.tv_transforms(image)
+
+        if self.kornia_transforms is not None:
+            image = self.kornia_transforms(image)
+
+        label = self._label_transforms(self.letters.index(label))
+
+        return image, label
+
+    def _setup_label_transforms(self):
+        return v2.Compose(
+            [
+                utils.OneHotLabel(self.num_letters),
+                utils.NDArrayToTensor(),
+                v2.ToDtype(torch.float32),
+            ]
+        )
+
+
+class Fingerspelling5ImageInmemory(Dataset):
+    def __init__(
+        self,
+        image_data: torch.Tensor,
+        # file_data: pd.DataFrame,
+        # dataset_path: pathlib.Path,
+        labels: npt.NDArray,
+        tv_transforms: Optional[v2.Transform] = None,
+        kornia_transforms: Optional[K.augmentation.AugmentationSequential] = None,
+        split: Optional[str] = None,
+    ) -> None:
+        self.split = split
+
+        # fingerspelling5 'properties'
+        self.letters = utils.fingerspelling5.letters
+        self.num_letters = len(self.letters)
+
+        self._label_transforms = self._setup_label_transforms()
+
+        self.tv_transforms = tv_transforms
+        self.kornia_transforms = kornia_transforms
+
+        self.image_data = image_data
+        self.labels = labels
+
+    def __len__(self) -> int:
+        return self.image_data.shape[0]
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        label = self.labels[idx]
+        image = self.image_data[idx]
 
         # it is expected that tv transforms contain
         # v2.ToImage()

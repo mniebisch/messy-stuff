@@ -4,7 +4,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import kornia as K
 import lightning as L
+import numpy as np
 import pandas as pd
+import torch
+import tqdm
 from kornia.augmentation.base import _AugmentationBase
 from numpy import typing as npt
 from torch.utils import data as torch_data
@@ -12,8 +15,13 @@ from torch_geometric.transforms import BaseTransform
 from torchvision.transforms import v2
 
 from fmp.datasets import fingerspelling5
+from fmp.transforms import PadToSize
 
-__all__ = ["Fingerspelling5ImageDataModule", "Fingerspelling5LandmarkDataModule"]
+__all__ = [
+    "Fingerspelling5ImageDataModule",
+    "Fingerspelling5ImageInmemoryDataModule",
+    "Fingerspelling5LandmarkDataModule",
+]
 
 
 class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
@@ -221,17 +229,35 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         kornia_valid_transform_kwargs: Optional[Dict[str, Any]] = None,
         kornia_predict_transform_kwargs: Optional[Dict[str, Any]] = None,
         kornia_valid_transforms: Optional[List[_AugmentationBase]] = None,
+        kornia_test_transforms: Optional[List[_AugmentationBase]] = None,
+        kornia_test_transform_kwargs: Optional[Dict[str, Any]] = None,
         kornia_predict_transforms: Optional[List[_AugmentationBase]] = None,
         valid_transforms: Optional[v2.Transform] = None,
         predict_transforms: Optional[v2.Transform] = None,
+        test_transforms: Optional[v2.Transform] = None,
         datasplit_file: Optional[str] = None,
         dataquality_file: Optional[str] = None,
+        cpu_batch_transforms: Optional[List[_AugmentationBase]] = None,
+        gpu_batch_transforms: Optional[List[_AugmentationBase]] = None,
+        cpu_batch_transform_kwargs: Optional[Dict[str, Any]] = None,
+        gpu_batch_transform_kwargs: Optional[Dict[str, Any]] = None,
     ) -> None:
         # TODO add validation if required
         # TODO maybe find better name than datasplit file? predict case!?
         super().__init__()
         self.save_hyperparameters(
-            ignore=["train_transforms", "valid_transforms", "predict_transforms"]
+            ignore=[
+                "train_transforms",
+                "valid_transforms",
+                "test_transforms",
+                "predict_transforms",
+                "kornia_train_transforms",
+                "kornia_valid_transforms",
+                "kornia_test_transforms",
+                "kornia_predict_transforms",
+                "cpu_batch_transforms",
+                "gpu_batch_transforms",
+            ],
         )
 
         self.dataset_dir = dataset_dir
@@ -240,6 +266,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         self.num_dataloader_workers = num_dataloader_workers
         self.train_transforms = train_transforms
         self.valid_transforms = valid_transforms
+        self.test_transforms = test_transforms
         self.predict_transforms = predict_transforms
 
         kornia_train_transform_kwargs = (
@@ -251,6 +278,9 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
             {}
             if kornia_valid_transform_kwargs is None
             else kornia_valid_transform_kwargs
+        )
+        kornia_test_transform_kwargs = (
+            {} if kornia_test_transform_kwargs is None else kornia_test_transform_kwargs
         )
         kornia_predict_transform_kwargs = (
             {}
@@ -271,11 +301,40 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
             if kornia_valid_transforms
             else None
         )
+        self.kornia_test_transforms = (
+            K.augmentation.AugmentationSequential(
+                *kornia_test_transforms, **kornia_test_transform_kwargs
+            )
+            if kornia_test_transforms
+            else None
+        )
         self.kornia_predict_transforms = (
             K.augmentation.AugmentationSequential(
                 *kornia_predict_transforms, **kornia_predict_transform_kwargs
             )
             if kornia_predict_transforms
+            else None
+        )
+
+        cpu_batch_transform_kwargs = (
+            {} if cpu_batch_transform_kwargs is None else cpu_batch_transform_kwargs
+        )
+        gpu_batch_transform_kwargs = (
+            {} if gpu_batch_transform_kwargs is None else gpu_batch_transform_kwargs
+        )
+
+        self.cpu_batch_transforms = (
+            K.augmentation.AugmentationSequential(
+                *cpu_batch_transforms, **cpu_batch_transform_kwargs
+            )
+            if cpu_batch_transforms
+            else None
+        )
+        self.gpu_batch_transforms = (
+            K.augmentation.AugmentationSequential(
+                *gpu_batch_transforms, **gpu_batch_transform_kwargs
+            )
+            if gpu_batch_transforms
             else None
         )
 
@@ -286,6 +345,9 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         self.image_files_csv = self.get_image_files_csv()
 
     def setup(self, stage: str) -> None:
+        if self.gpu_batch_transforms is not None:
+            self.gpu_batch_transforms.to(self.trainer.model.device)
+
         if stage == "fit":
             fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
             if self.datasplit_file is None:
@@ -334,7 +396,14 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 split="valid",
             )
         elif stage == "test":
-            pass
+            fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
+
+            self.test_data = fingerspelling5.Fingerspelling5Image(
+                fingerspelling5_image_files,
+                pathlib.Path(self.images_data_dir),
+                tv_transforms=self.test_transforms,
+                kornia_transforms=self.kornia_test_transforms,
+            )
         elif stage == "predict":
             fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
 
@@ -417,8 +486,359 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         )
         return [train_loader, valid_loader]
 
-    def test_dataloader(self) -> None:
-        raise NotImplementedError
+    def test_dataloader(self) -> torch_data.DataLoader:
+        return torch_data.DataLoader(
+            self.test_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_dataloader_workers,
+        )
+
+    def predict_dataloader(self) -> torch_data.DataLoader:
+        return torch_data.DataLoader(
+            self.predict_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_dataloader_workers,
+        )
+
+    def get_image_files_csv(self) -> pathlib.Path:
+        dataset_path = pathlib.Path(self.dataset_dir)
+        return dataset_path / "image_files.csv"
+
+    def on_before_batch_transfer(self, batch, dataloader_idx):
+        if self.trainer.training and self.cpu_batch_transforms is not None:
+            if isinstance(batch, (list, tuple)) and len(batch) == 2:
+                images, labels = batch
+                images = self.cpu_batch_transforms(images)
+                return images, labels
+            elif isinstance(batch, torch.Tensor):
+                return self.cpu_batch_transforms(batch)
+            else:
+                raise TypeError(
+                    f"Unsupported batch type: {type(batch)}. Expected list, tuple, or Tensor."
+                )
+        else:
+            return batch
+
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        if self.trainer.training and self.gpu_batch_transforms is not None:
+            if isinstance(batch, (list, tuple)) and len(batch) == 2:
+                images, labels = batch
+                images = self.gpu_batch_transforms(images)
+                return images, labels
+            elif isinstance(batch, torch.Tensor):
+                return self.gpu_batch_transforms(batch)
+            else:
+                raise TypeError(
+                    f"Unsupported batch type: {type(batch)}. Expected list, tuple, or Tensor."
+                )
+        else:
+            return batch
+
+
+class Fingerspelling5ImageInmemoryDataModule(L.LightningDataModule):
+    def __init__(
+        self,
+        dataset_dir: str,
+        images_data_dir: str,
+        batch_size: int,
+        num_dataloader_workers: int = 0,
+        train_transforms: Optional[v2.Transform] = None,
+        kornia_train_transforms: Optional[List[_AugmentationBase]] = None,
+        kornia_train_transform_kwargs: Optional[Dict[str, Any]] = None,
+        kornia_valid_transform_kwargs: Optional[Dict[str, Any]] = None,
+        kornia_valid_transforms: Optional[List[_AugmentationBase]] = None,
+        kornia_test_transform_kwargs: Optional[Dict[str, Any]] = None,
+        kornia_test_transforms: Optional[List[_AugmentationBase]] = None,
+        kornia_predict_transform_kwargs: Optional[Dict[str, Any]] = None,
+        kornia_predict_transforms: Optional[List[_AugmentationBase]] = None,
+        valid_transforms: Optional[v2.Transform] = None,
+        test_transforms: Optional[v2.Transform] = None,
+        predict_transforms: Optional[v2.Transform] = None,
+        datasplit_file: Optional[str] = None,
+        dataquality_file: Optional[str] = None,
+    ) -> None:
+        # TODO add validation if required
+        # TODO maybe find better name than datasplit file? predict case!?
+        super().__init__()
+        self.save_hyperparameters(
+            ignore=["train_transforms", "valid_transforms", "predict_transforms"]
+        )
+
+        self.dataset_dir = dataset_dir
+        self.images_data_dir = images_data_dir
+        self.batch_size = batch_size
+        self.num_dataloader_workers = num_dataloader_workers
+        self.train_transforms = train_transforms
+        self.valid_transforms = valid_transforms
+        self.test_transforms = test_transforms
+        self.predict_transforms = predict_transforms
+
+        kornia_train_transform_kwargs = (
+            {}
+            if kornia_train_transform_kwargs is None
+            else kornia_train_transform_kwargs
+        )
+        kornia_valid_transform_kwargs = (
+            {}
+            if kornia_valid_transform_kwargs is None
+            else kornia_valid_transform_kwargs
+        )
+        kornia_test_transform_kwargs = (
+            {} if kornia_test_transform_kwargs is None else kornia_test_transform_kwargs
+        )
+        kornia_predict_transform_kwargs = (
+            {}
+            if kornia_predict_transform_kwargs is None
+            else kornia_predict_transform_kwargs
+        )
+        self.kornia_train_transforms = (
+            K.augmentation.AugmentationSequential(
+                *kornia_train_transforms, **kornia_train_transform_kwargs
+            )
+            if kornia_train_transforms
+            else None
+        )
+        self.kornia_valid_transforms = (
+            K.augmentation.AugmentationSequential(
+                *kornia_valid_transforms, **kornia_valid_transform_kwargs
+            )
+            if kornia_valid_transforms
+            else None
+        )
+        self.kornia_test_transforms = (
+            K.augmentation.AugmentationSequential(
+                *kornia_test_transforms, **kornia_test_transform_kwargs
+            )
+            if kornia_test_transforms
+            else None
+        )
+        self.kornia_predict_transforms = (
+            K.augmentation.AugmentationSequential(
+                *kornia_predict_transforms, **kornia_predict_transform_kwargs
+            )
+            if kornia_predict_transforms
+            else None
+        )
+
+        self.datasplit_file = datasplit_file
+        self.dataquality_file = dataquality_file
+        self.dataset_name = pathlib.Path(dataset_dir).name
+
+        self.image_files_csv = self.get_image_files_csv()
+
+    def setup(self, stage: str) -> None:
+        if stage == "fit":
+            fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
+            if self.datasplit_file is None:
+                raise ValueError(
+                    "Fit without 'datasplit_file' not possible. "
+                    "Please provide 'datasplit_file'."
+                )
+            split_data = pd.read_csv(self.datasplit_file)
+            validate_datasplit_data(fingerspelling5_image_files, split_data)
+            train_index, valid_index = load_datasplit_indices(split_data)
+
+            if self.dataquality_file is not None:
+                dataquality_data = pd.read_csv(self.dataquality_file)
+                quality_indices = dataquality_data["is_corrupted"]
+
+                train_index = train_index & ~quality_indices.values
+                valid_index = valid_index & ~quality_indices.values
+
+            train_data = fingerspelling5_image_files.loc[train_index].reset_index(
+                drop=True
+            )
+            valid_data = fingerspelling5_image_files.loc[valid_index].reset_index(
+                drop=True
+            )
+
+            images_data_dir = pathlib.Path(self.images_data_dir)
+            train_images = [
+                K.io.load_image(
+                    images_data_dir / filename,
+                    desired_type=K.io.ImageLoadType.RGB8,
+                    device="cpu",
+                )
+                for filename in tqdm.tqdm(train_data["img_file"])
+            ]
+            train_image_sizes = np.stack(
+                [np.array(image.shape[1:]) for image in train_images]
+            )
+            train_labels = train_data["letter"].values
+            train_max_height, train_max_width = np.max(train_image_sizes, axis=0)
+            train_padder = PadToSize(
+                size=(train_max_height, train_max_width),
+                fill=0,
+            )
+
+            train_images = [train_padder(image) for image in train_images]
+            train_images = torch.stack(train_images)
+
+            # self.train_data = fingerspelling5.Fingerspelling5Image(
+            #     train_data,
+            #     pathlib.Path(self.images_data_dir),
+            #     tv_transforms=self.train_transforms,
+            #     kornia_transforms=self.kornia_train_transforms,
+            # )
+
+            self.train_data = fingerspelling5.Fingerspelling5ImageInmemory(
+                train_images,
+                train_labels,
+                tv_transforms=self.train_transforms,
+                kornia_transforms=self.kornia_train_transforms,
+            )
+
+            valid_images = [
+                K.io.load_image(
+                    images_data_dir / filename,
+                    desired_type=K.io.ImageLoadType.RGB8,
+                    device="cpu",
+                )
+                for filename in tqdm.tqdm(valid_data["img_file"])
+            ]
+            valid_image_sizes = np.stack(
+                [np.array(image.shape[1:]) for image in valid_images]
+            )
+            valid_labels = valid_data["letter"].values
+            valid_max_height, valid_max_width = np.max(valid_image_sizes, axis=0)
+            valid_padder = PadToSize(
+                size=(valid_max_height, valid_max_width),
+                fill=0,
+            )
+            valid_images = [valid_padder(image) for image in valid_images]
+            valid_images = torch.stack(valid_images)
+
+            # self.valid_train_data = fingerspelling5.Fingerspelling5Image(
+            #     train_data,
+            #     pathlib.Path(self.images_data_dir),
+            #     tv_transforms=self.valid_transforms,
+            #     kornia_transforms=self.kornia_valid_transforms,
+            #     split="train",
+            # )
+            self.valid_train_data = fingerspelling5.Fingerspelling5ImageInmemory(
+                valid_images,
+                valid_labels,
+                tv_transforms=self.valid_transforms,
+                kornia_transforms=self.kornia_valid_transforms,
+            )
+
+            # self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
+            #     valid_data,
+            #     pathlib.Path(self.images_data_dir),
+            #     tv_transforms=self.valid_transforms,
+            #     kornia_transforms=self.kornia_valid_transforms,
+            #     split="valid",
+            # )
+            self.valid_valid_data = fingerspelling5.Fingerspelling5ImageInmemory(
+                valid_images,
+                valid_labels,
+                tv_transforms=self.valid_transforms,
+                kornia_transforms=self.kornia_valid_transforms,
+            )
+        elif stage == "test":
+            fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
+
+            self.test_data = fingerspelling5.Fingerspelling5Image(
+                fingerspelling5_image_files,
+                pathlib.Path(self.images_data_dir),
+                tv_transforms=self.test_transforms,
+                kornia_transforms=self.kornia_test_transforms,
+            )
+
+        elif stage == "predict":
+            fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
+
+            self.predict_data = fingerspelling5.Fingerspelling5Image(
+                fingerspelling5_image_files,
+                pathlib.Path(self.images_data_dir),
+                tv_transforms=self.predict_transforms,
+                kornia_transforms=self.kornia_predict_transforms,
+            )
+        elif stage == "validate":
+            fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
+            if self.datasplit_file is None:
+                raise ValueError(
+                    "Fit without 'datasplit_file' not possible. "
+                    "Please provide 'datasplit_file'."
+                )
+            split_data = pd.read_csv(self.datasplit_file)
+            validate_datasplit_data(fingerspelling5_image_files, split_data)
+            train_index, valid_index = load_datasplit_indices(split_data)
+
+            if self.dataquality_file is not None:
+                dataquality_data = pd.read_csv(self.dataquality_file)
+                quality_indices = dataquality_data["is_corrupted"]
+
+                train_index = train_index & ~quality_indices.values
+                valid_index = valid_index & ~quality_indices.values
+
+            train_data = fingerspelling5_image_files.loc[train_index].reset_index(
+                drop=True
+            )
+            valid_data = fingerspelling5_image_files.loc[valid_index].reset_index(
+                drop=True
+            )
+
+            self.valid_train_data = fingerspelling5.Fingerspelling5Image(
+                train_data,
+                pathlib.Path(self.images_data_dir),
+                transforms=self.valid_transforms,
+                split="train",
+            )
+
+            self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
+                valid_data,
+                pathlib.Path(self.images_data_dir),
+                transforms=self.valid_transforms,
+                split="valid",
+            )
+        else:
+            pass
+
+    def prepare_data(self) -> None:
+        pass
+
+    def train_dataloader(self) -> torch_data.DataLoader:
+        return torch_data.DataLoader(
+            self.train_data,
+            batch_size=self.batch_size,
+            shuffle=True,
+            drop_last=True,
+            num_workers=self.num_dataloader_workers,
+            persistent_workers=True,
+            pin_memory=True,
+            # prefetch_factor=1,
+        )
+
+    def val_dataloader(self) -> List[torch_data.DataLoader]:
+        train_loader = torch_data.DataLoader(
+            self.valid_train_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_dataloader_workers,
+        )
+        valid_loader = torch_data.DataLoader(
+            self.valid_valid_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_dataloader_workers,
+        )
+        return [train_loader, valid_loader]
+
+    def test_dataloader(self) -> torch_data.DataLoader:
+        return torch_data.DataLoader(
+            self.test_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_dataloader_workers,
+        )
 
     def predict_dataloader(self) -> torch_data.DataLoader:
         return torch_data.DataLoader(
