@@ -1,12 +1,11 @@
 from lightning.pytorch.cli import LightningCLI
 
-from fmp import datasets, models
+from fmp import models
 
 
 def cli_main():
     cli = LightningCLI(
         model_class=models.Identity,
-        datamodule_class=datasets.fingerspelling5.Fingerspelling5LandmarkDataModule,
     )
 
 
