@@ -76,7 +76,11 @@ def main(dataset_dir: pathlib.Path, letters: List[str]) -> None:
         splits_subset = [subset_letters(split, letters) for split in splits]
 
         for split_subset, split_file in zip(splits_subset, split_files):
-            split_subset.to_csv(output_dataset_path / split_file.name, index=False)
+            split_subset.to_csv(
+                output_dataset_path
+                / split_file.name.replace(dataset_name, output_dataset_name),
+                index=False,
+            )
 
     # load image sizes [OPTIONAL]
     image_sizes_filepath = dataset_dir / "image_sizes.csv"
