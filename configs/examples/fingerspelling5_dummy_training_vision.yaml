@@ -33,9 +33,51 @@ data:
       class_path: torchvision.transforms.v2.Compose
       init_args:
         transforms:
+          - class_path: fmp.transforms.FXAALite
+            init_args:
+              tau: 12
+              dilate_k: 5
+              sigma: 0.9
+              passes: 2
+          - class_path: fmp.transforms.ImageSharpening
           - class_path: torchvision.transforms.v2.RandomHorizontalFlip
             init_args:
               p: 0.5
+          - class_path: torchvision.transforms.v2.ToDtype
+            init_args:
+              dtype:
+                class_path: torch.float32
+              scale: true
+          - class_path: torchvision.transforms.v2.ScaleJitter
+            init_args:
+              target_size: [224, 224]
+              scale_range: [0.8, 1.2]
+          - class_path: fmp.transforms.CropOrPad
+            init_args:
+              target_size: [300, 300]
+    valid_transforms:
+      class_path: torchvision.transforms.v2.Compose
+      init_args:
+        transforms:
+          - class_path: fmp.transforms.FXAALite
+            init_args:
+              tau: 12
+              dilate_k: 5
+              sigma: 0.9
+              passes: 2
+          - class_path: fmp.transforms.ImageSharpening
+          - class_path: torchvision.transforms.v2.ToDtype
+            init_args:
+              dtype:
+                class_path: torch.float32
+              scale: true
+          - class_path: torchvision.transforms.v2.ScaleJitter
+            init_args:
+              target_size: [224, 224]
+              scale_range: [0.8, 1.2]
+          - class_path: fmp.transforms.PadToSize
+            init_args:
+              size: 272
 optimizer:
   class_path: torch.optim.AdamW
   init_args:

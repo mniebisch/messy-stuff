@@ -7,6 +7,13 @@ trainer:
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: epoch
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        monitor: acc/valid
+        mode: max
+        save_top_k: 1
+        every_n_epochs: 3
+        save_last: true
   logger:
     class_path: lightning.pytorch.loggers.TensorBoardLogger
     init_args:

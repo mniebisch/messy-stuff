@@ -1,0 +1,13 @@
+trainer:
+  accelerator: cpu
+  callbacks:
+    - class_path: fmp.lit_tools.callbacks.ImageStatWriter
+data:
+  class_path: fmp.datasets.fingerspelling5.Fingerspelling5ImageDataModule
+  init_args:
+    dataset_dir: ./data/fingerspelling5/fingerspelling5_dummy
+    images_data_dir: ../../data/
+    datasplit_file: ./data/fingerspelling5/fingerspelling5_dummy/split_00_fingerspelling5_dummy.csv
+    batch_size: 64
+    num_dataloader_workers: 23
+return_predictions: False
