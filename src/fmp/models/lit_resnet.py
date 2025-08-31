@@ -9,9 +9,8 @@ __all__ = ["ResNetClassifier"]
 
 
 class ResNetClassifier(L.LightningModule):
-    def __init__(self, model: nn.Module):
+    def __init__(self, model: nn.Module) -> None:
         super(ResNetClassifier, self).__init__()
-        # self.save_hyperparameters()
         self.save_hyperparameters(ignore=["model"])
 
         self.example_input_array = torch.rand(1, 3, 224, 224)
@@ -46,6 +45,21 @@ class ResNetClassifier(L.LightningModule):
         acc = correct / total
         split = self.trainer.val_dataloaders[dataloader_idx].dataset.split
         self.log(f"acc/{split}", acc, add_dataloader_idx=False)
+
+    def test_step(
+        self,
+        batch: Tuple[torch.Tensor, torch.Tensor],
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ) -> None:
+        images, labels = batch
+        predictions = self(images)
+        predictions = torch.argmax(predictions, dim=1)
+        labels = torch.argmax(labels, dim=1)
+        total = labels.shape[0]
+        correct = (predictions == labels).sum()
+        acc = correct / total
+        self.log("acc/test", acc)
 
     def predict_step(
         self,
