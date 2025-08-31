@@ -6,3 +6,4 @@ runs/
 lightning_logs/
 logs/
 predictions/
+_cache_*
