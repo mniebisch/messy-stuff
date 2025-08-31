@@ -49,15 +49,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++  build-essential  libjpeg-turbo8-dev \
     && rm -rf /var/lib/apt/lists/*
 
+
+RUN pip install --no-cache-dir \
+    opencv-python-headless==4.11.0.86 \
+    numpy==2.2.5
+
 RUN pip install --no-cache-dir \
     git+https://github.com/xinntao/BasicSR.git@master \
     git+https://github.com/xinntao/Real-ESRGAN.git@master \
-    # force headless OpenCV *after* all other deps
-    opencv-python-headless==4.10.0.82 \
     facexlib==0.3.0 \
-    # … rest of your list …
     && pip cache purge
-
+    
 RUN pip uninstall -y opencv-python opencv-python-headless \
     && pip install --no-cache-dir opencv-python-headless==4.11.0.86
 # ————————————————————————————————————————
