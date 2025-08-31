@@ -3,10 +3,11 @@ from typing import Tuple
 import lightning as L
 import torch
 
-
 __all__ = ["Identity"]
 
 
+# TODO make clear that LightningModule Identity
+# TODO keep torch.nn.Identity in mind
 class Identity(L.LightningModule):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x
