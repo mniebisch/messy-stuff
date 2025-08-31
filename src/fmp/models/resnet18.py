@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 import torch.nn as nn
@@ -13,9 +13,10 @@ class ResNet18(nn.Module):
         num_classes: int,
         imagenet_ckpt_path: Optional[str] = None,
         pretrained_ckpt_path: Optional[str] = None,
+        **resnet_kwargs: Any,
     ) -> None:
         super(ResNet18, self).__init__()
-        self.model = models.resnet18(weights=None)
+        self.model = models.resnet18(weights=None, **resnet_kwargs)
 
         if imagenet_ckpt_path is not None and pretrained_ckpt_path is not None:
             raise ValueError(
