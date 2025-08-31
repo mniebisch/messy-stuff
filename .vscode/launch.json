@@ -144,7 +144,7 @@
             "args": [
                 "fit",
                 "--config",
-                "configs/examples/fingerspelling5_dummy_training_vision.yaml"
+                "configs/examples/fingerspelling5_dummy_training_vision.yaml",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
@@ -268,9 +268,7 @@
             "program": "${workspaceFolder}/apps/compare_predictions.py",
             "args": [
                 "-p",
-                "predictions/example/prediction__fingerspelling5_dummy__version_63__epoch=8-step=9.yaml",
-                "-p",
-                "predictions/example/prediction__fingerspelling5_dummy__version_62__epoch=8-step=9.yaml",
+                "predictions/example/landmark_dummy/prediction__fingerspelling5_dummy__version_0__last.yaml",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
@@ -317,6 +315,150 @@
                 "l",
                 "--letters",
                 "y",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Compute Image Stats [Dummy]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/compute_fingerspelling5_metrics.py",
+            "args": [
+                "predict",
+                "--config",
+                "configs/examples/fingerspelling5_dummy_image_stats.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Compute Image Stats",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/compute_fingerspelling5_metrics.py",
+            "args": [
+                "predict",
+                "--config",
+                "configs/fingerspelling5_singlehands/compute_img_stats_fingerspelling5.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug validate",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
+            "args": [
+                "validate",
+                "--config",
+                "configs/fingerspelling5_singlehands/train_resnet18.yaml",
+                "--ckpt_path",
+                "logs/fingerspelling5_resnet18_cly_subset/version_6/checkpoints/epoch=59-step=2940.ckpt"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug predict",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
+            "args": [
+                "predict",
+                "--config",
+                "config_logs/resnet_cly/b1ea7058f4734a09bf59690f/config.yaml",
+                "--config",
+                "configs/fingerspelling5_singlehands/predict_resnet18_micha_cropped.yaml",
+                "--ckpt_path",
+                "checkpoints/resnet_cly/b1ea7058f4734a09bf59690f/epoch=0-step=93.ckpt"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug image from dir",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/create_image_files_csv_from_dir.py",
+            "args": [
+                "--dataset-dir",
+                "data/fingerspelling5/fingerspelling5_singlehands_sorted_upscaled__cly",
+                "--fingerspelling5-images-dir",
+                "../../data/fingerspelling5_deblurred"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug create fingerspelling5 splits from image files",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/create_fingerspelling5_splits_from_image_files.py",
+            "args": [
+                "--dataset-dir",
+                "data/fingerspelling5/fingerspelling5_singlehands_sorted_upscaled__cly"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug copy data quality file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/copy_data_quality_file.py",
+            "args": [
+                "--dataset-dir-source",
+                "data/fingerspelling5/fingerspelling5_singlehands_sorted__cly",
+                "--dataset-dir-target",
+                "data/fingerspelling5/fingerspelling5_singlehands_sorted_upscaled__cly"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Train dev",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
+            "args": [
+                "fit",
+                "--config",
+                "${workspaceFolder}/configs/fingerspelling5_singlehands/train_dev.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Train profiling",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
+            "args": [
+                "fit",
+                "--trainer.num_sanity_val_steps",
+                "0",
+                "--config",
+                // "${workspaceFolder}/configs/fingerspelling5_singlehands/train_resnet18_profiling.yaml"
+                "${workspaceFolder}/configs/fingerspelling5_singlehands/train_resnet18_kornia.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Test Metric Aim",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_fingerspelling5_litcli.py",
+            "args": [
+                "test",
+                "--config",
+                "${workspaceFolder}/config_logs/resnet_cly/3b9c7d613fc744379537a08e/config.yaml",
+                "--config",
+                "${workspaceFolder}/configs/fingerspelling5_singlehands/test_resnet18_cropped.yaml",
+                "--ckpt_path",
+                "${workspaceFolder}/checkpoints/resnet_cly/3b9c7d613fc744379537a08e/epoch=69-step=6510.ckpt"
             ],
             "console": "integratedTerminal",
             "justMyCode": false
