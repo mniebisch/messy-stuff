@@ -31,6 +31,7 @@ class MLFlowImageLogger(Callback):
         normalize_mean: Optional[List[float]] = None,
         normalize_std: Optional[List[float]] = None,
         artifact_path: str = "training_images",
+        enable_image_grid: bool = False,
     ):
         """
         Args:
@@ -40,6 +41,7 @@ class MLFlowImageLogger(Callback):
             normalize_mean: Mean values used for normalization (for denormalization)
             normalize_std: Std values used for normalization (for denormalization)
             artifact_path: Base path within MLFlow artifacts for images
+            enable_image_grid: Enable Image Grid visualization (causes URL encoding bug in MLFlow)
         """
         super().__init__()
 
@@ -53,6 +55,7 @@ class MLFlowImageLogger(Callback):
         ]  # ImageNet defaults
         self.normalize_std = normalize_std or [0.229, 0.224, 0.225]  # ImageNet defaults
         self.artifact_path = artifact_path
+        self.enable_image_grid = enable_image_grid
 
         # Internal state
         self._last_logged_epoch = -1
@@ -125,7 +128,7 @@ class MLFlowImageLogger(Callback):
         return torch.clamp(denorm_image, 0, 1)
 
     def _log_images_to_mlflow(self, images: torch.Tensor, trainer: L.Trainer):
-        """Log images to MLFlow using artifact_file parameter to avoid URL encoding issues."""
+        """Log images to MLFlow with configurable Image Grid support."""
         mlflow_logger = self._get_mlflow_logger(trainer)
         if mlflow_logger is None:
             return
@@ -135,6 +138,9 @@ class MLFlowImageLogger(Callback):
         sample_images = images[:n_images]
 
         logged_count = 0
+        epoch = trainer.current_epoch
+        step = trainer.global_step
+
         for i, image in enumerate(sample_images):
             try:
                 # Denormalize if needed
@@ -147,32 +153,41 @@ class MLFlowImageLogger(Callback):
                 # Convert to PIL Image
                 pil_image = TF.to_pil_image(image)
 
-                # Use artifact_file parameter with .png extension for clean filenames
-                # This avoids the % encoding issues caused by the key parameter
-                epoch = trainer.current_epoch
-                step = trainer.global_step
-                artifact_filename = f"training_images/epoch_{epoch:03d}/train_step_{step:06d}_img_{i:02d}.png"
+                if self.enable_image_grid:
+                    # Use key + step for Image Grid visualization
+                    # WARNING: This triggers MLFlow's URL encoding bug (% characters)
+                    # but enables the nice grid view in MLFlow UI
+                    key = f"train_epoch_{epoch:03d}_img_{i:02d}"
 
-                # Log image using artifact_file parameter (not key/step)
-                mlflow_logger.experiment.log_image(
-                    run_id=mlflow_logger.run_id,
-                    image=pil_image,
-                    artifact_file=artifact_filename,
-                    # key=f"epoch_{epoch:03d}_train_step_{step:06d}_img_{i:02d}",
-                    # step=step,  # Enables visualization in charts. But deactivated for now
-                    # as something with MLFlow UI seems broken. wait for bug fix
-                    # slashes in keys are not supported
-                    # https://github.com/mlflow/mlflow/issues/12151?utm_source=chatgpt.com
-                )
+                    mlflow_logger.experiment.log_image(
+                        run_id=mlflow_logger.run_id,
+                        image=pil_image,
+                        key=key,
+                        step=step,  # Required for Image Grid, but causes URL encoding bug
+                    )
+                else:
+                    # Use artifact_file for clean URLs but no Image Grid
+                    # This avoids the % encoding issues but images won't show in grid view
+                    artifact_filename = f"{self.artifact_path}/epoch_{epoch:03d}/train_step_{step:06d}_img_{i:02d}.png"
+
+                    mlflow_logger.experiment.log_image(
+                        run_id=mlflow_logger.run_id,
+                        image=pil_image,
+                        artifact_file=artifact_filename,
+                    )
+
                 logged_count += 1
 
             except Exception as e:
                 print(f"Warning: Failed to log image {i}: {e}")
 
         if logged_count > 0:
-            print(
-                f"Logged {logged_count} images to MLFlow artifacts (epoch {trainer.current_epoch})"
-            )
+            mode = "Image Grid" if self.enable_image_grid else "artifacts"
+            print(f"Logged {logged_count} images to MLFlow {mode} (epoch {epoch})")
+            if self.enable_image_grid:
+                print(
+                    "  ⚠️  Note: Image Grid mode may cause URL encoding issues due to MLFlow bug"
+                )
 
     def on_train_batch_end(
         self,
