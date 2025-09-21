@@ -1,0 +1,134 @@
+# Enhanced training config for linking to future test runs
+# This adds run_type and stage tags to support testing workflow
+
+seed_everything: false
+
+trainer:
+  max_epochs: 210 # Real training
+  log_every_n_steps: 1
+  check_val_every_n_epoch: 1
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: epoch
+    - class_path: fmp.lit_tools.callbacks.mlflow.MLFlowModelCheckpoint
+      init_args:
+        dirpath: ./checkpoints
+        monitor: acc/valid
+        mode: max
+        save_top_k: 5
+        log_top_k_as_artifacts: true
+        log_best_as_artifact: false
+        log_improvement_history: false
+  logger:
+    class_path: lightning.pytorch.loggers.MLFlowLogger
+    init_args:
+      experiment_name: fingerspelling5 # Training experiments
+      tracking_uri: "sqlite:///mlruns.db"
+      tags:
+        # Workflow tags
+        run_type: training # Mark as training run
+
+        # Original tags
+        project: fingerspelling5
+        data_version: original_with_background
+        data_type: image
+
+model:
+  class_path: fmp.models.ResNetClassifier
+  init_args:
+    model:
+      class_path: fmp.models.ResNet18
+      init_args:
+        num_classes: 24
+
+data:
+  class_path: fmp.datasets.fingerspelling5.Fingerspelling5ImageDataModule
+  init_args:
+    dataset_dir: ./data/fingerspelling5/fingerspelling5_singlehands_sorted__cly
+    datasplit_file: ./data/fingerspelling5/fingerspelling5_singlehands_sorted__cly/split_00_fingerspelling5_singlehands_sorted__cly.csv
+    images_data_dir: ../../data/
+    dataquality_file: ./data/fingerspelling5/fingerspelling5_singlehands_sorted__cly/fingerspelling5_singlehands_sorted__cly__data_quality.csv
+    batch_size: 128
+    num_dataloader_workers: 23
+    train_transforms:
+      class_path: torchvision.transforms.v2.Compose
+      init_args:
+        transforms:
+          - class_path: fmp.transforms.ScaleJitter
+            init_args:
+              target_size: [300, 300]
+              scale_range: [0.1, 1.1]
+          - class_path: fmp.transforms.BackgroundImage
+            init_args:
+              data_root: ../../data/lsun
+              image_transforms:
+                class_path: torchvision.transforms.v2.Compose
+                init_args:
+                  transforms:
+                    - class_path: torchvision.transforms.v2.ToImage
+          - class_path: fmp.transforms.CropOrPad
+            init_args:
+              target_size: [300, 300]
+          - class_path: torchvision.transforms.v2.ToDtype
+            init_args:
+              dtype:
+                class_path: torch.float32
+              scale: true
+          - class_path: torchvision.transforms.v2.ToPureTensor
+    kornia_train_transforms:
+      - class_path: kornia.augmentation.RandomElasticTransform
+    kornia_train_transform_kwargs:
+      keepdim: true
+    valid_transforms:
+      class_path: torchvision.transforms.v2.Compose
+      init_args:
+        transforms:
+          - class_path: torchvision.transforms.v2.ToImage
+          - class_path: torchvision.transforms.v2.ToDtype
+            init_args:
+              dtype:
+                class_path: torch.float32
+              scale: true
+          - class_path: torchvision.transforms.v2.Normalize
+            init_args:
+              mean: [0.4648, 0.3651, 0.3616]
+              std: [0.2526, 0.2633, 0.2523]
+          - class_path: fmp.transforms.PadToSize
+            init_args:
+              size: 272
+          - class_path: torchvision.transforms.v2.ToPureTensor
+    gpu_batch_transforms:
+      - class_path: kornia.augmentation.RandomHorizontalFlip
+        init_args:
+          p: 0.5
+      - class_path: kornia.augmentation.RandomHorizontalFlip
+      - class_path: kornia.augmentation.ColorJitter
+        init_args:
+          brightness: 0.9
+          contrast: 1.0
+          saturation: 1.0
+          hue: [-0.5, 0.5]
+      - class_path: kornia.augmentation.RandomEqualize
+      - class_path: kornia.augmentation.RandomSolarize
+        init_args:
+          thresholds: [0.0, 0.1]
+          p: 1.0
+      - class_path: kornia.augmentation.RandomPosterize
+        init_args:
+          bits: [1, 8]
+          p: 1.0
+      - class_path: kornia.augmentation.Normalize
+        init_args:
+          mean: [0.4648, 0.3651, 0.3616]
+          std: [0.2526, 0.2633, 0.2523]
+
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 0.0005
+
+lr_scheduler:
+  class_path: torch.optim.lr_scheduler.CosineAnnealingLR
+  init_args:
+    T_max: 210

@@ -1,0 +1,48 @@
+# lightning.pytorch==2.2.1
+trainer:
+  logger:
+    class_path: lightning.pytorch.loggers.MLFlowLogger
+    init_args:
+      experiment_name: fingerspelling5 # Training experiments
+      tracking_uri: "sqlite:///mlruns.db"
+      tags:
+        # Workflow tags
+        run_type: testing
+
+        # Original tags
+        project: fingerspelling5
+        data_version: micha_cropped
+        data_type: image
+        run_id: 7975a577d3814d6f98834aeb3a3916c2
+        eval_param_resize: 1.0
+        ckpt: epoch_29
+
+data:
+  class_path: fmp.datasets.fingerspelling5.Fingerspelling5ImageDataModule
+  init_args:
+    dataset_dir: ./data/fingerspelling5/fingerspelling5_singlehands_micha_sorted_cropped__cly
+    datasplit_file: null
+    dataquality_file: null
+    images_data_dir: ../../data/recorded/asl_alphabet/
+    batch_size: 128
+    test_transforms:
+      class_path: torchvision.transforms.v2.Compose
+      init_args:
+        transforms:
+          - class_path: torchvision.transforms.v2.ToDtype
+            init_args:
+              dtype:
+                class_path: torch.float32
+              scale: true
+          - class_path: torchvision.transforms.v2.Normalize
+            init_args:
+              mean: [0.5897, 0.5138, 0.4917]
+              std: [0.1127, 0.1568, 0.1681]
+              # mean: [0.5221, 0.4982, 0.4869]
+              # std: [0.2107, 0.2226, 0.2214]
+          # - class_path: fmp.transforms.FactorResize
+          #   init_args:
+          #     factor: 0.9
+          - class_path: fmp.transforms.PadToSize
+            init_args:
+              size: 400
