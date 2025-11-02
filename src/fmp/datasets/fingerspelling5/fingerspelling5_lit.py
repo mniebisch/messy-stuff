@@ -374,7 +374,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
             )
 
             self.train_data = fingerspelling5.Fingerspelling5Image(
-                train_data,
+                train_data.iloc[:300],
                 pathlib.Path(self.images_data_dir),
                 tv_transforms=self.train_transforms,
                 kornia_transforms=self.kornia_train_transforms,
@@ -385,7 +385,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 pathlib.Path(self.images_data_dir),
                 tv_transforms=self.valid_transforms,
                 kornia_transforms=self.kornia_valid_transforms,
-                split="train",
+                split="train_split",
             )
 
             self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
@@ -393,7 +393,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 pathlib.Path(self.images_data_dir),
                 tv_transforms=self.valid_transforms,
                 kornia_transforms=self.kornia_valid_transforms,
-                split="valid",
+                split="valid_split",
             )
         elif stage == "test":
             fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
@@ -442,14 +442,14 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 train_data,
                 pathlib.Path(self.images_data_dir),
                 transforms=self.valid_transforms,
-                split="train",
+                split="train_split",
             )
 
             self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
                 valid_data,
                 pathlib.Path(self.images_data_dir),
                 transforms=self.valid_transforms,
-                split="valid",
+                split="valid_split",
             )
         else:
             pass

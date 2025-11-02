@@ -4,7 +4,10 @@ import kornia as K
 import lightning as L
 import torch
 import torch.nn as nn
+import torchmetrics
 from torch.nn import functional as F
+
+from fmp.models.resnet18 import ResNet18
 
 KorniaAugmentations = Optional[List[K.augmentation.AugmentationBase2D]]
 
@@ -30,7 +33,10 @@ class ResNetClassifier(L.LightningModule):
 
         self.example_input_array = torch.rand(1, 3, 224, 224)
 
-        self.model = model
+        if not isinstance(model, ResNet18):
+            raise ValueError("model must be an instance of ResNet18")
+
+        self.resnet = model
 
         self.train_gpu_augmentations = _construct_transforms(
             train_gpu_augmentations, train_gpu_kwargs
@@ -45,8 +51,13 @@ class ResNetClassifier(L.LightningModule):
             predict_gpu_augmentations, predict_gpu_kwargs
         )
 
+        self.val_acc_overall = torchmetrics.Accuracy(
+            task="multiclass", num_classes=self.resnet.model.fc.out_features
+        )
+        self.val_acc_per_split = torch.nn.ModuleDict()
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
+        return self.resnet(x)
 
     def training_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
@@ -68,11 +79,34 @@ class ResNetClassifier(L.LightningModule):
         predictions = self(images)
         predictions = torch.argmax(predictions, dim=1)
         labels = torch.argmax(labels, dim=1)
-        total = labels.shape[0]
-        correct = (predictions == labels).sum()
-        acc = correct / total
-        split = self.trainer.val_dataloaders[dataloader_idx].dataset.split
-        self.log(f"acc/{split}", acc, add_dataloader_idx=False)
+
+        split_name = self.trainer.val_dataloaders[dataloader_idx].dataset.split
+
+        if split_name not in self.val_acc_per_split:
+            if split_name in {"train", "valid"}:
+                raise ValueError(
+                    f"Dataset split name '{split_name}' is reserved by torch ModuleDict. "
+                    "Please use different split names."
+                )
+            metric = torchmetrics.Accuracy(
+                task="multiclass", num_classes=self.resnet.model.fc.out_features
+            )
+            metric = metric.to(self.device)
+            self.val_acc_per_split[split_name] = metric
+
+        self.val_acc_per_split[split_name].update(predictions, labels)
+        if split_name != "train_split":
+            self.val_acc_overall.update(predictions, labels)
+
+    def on_validation_epoch_end(self) -> None:
+        for split_name, metric in self.val_acc_per_split.items():
+            acc = metric.compute()
+            self.log(f"acc/{split_name}", acc)
+            metric.reset()
+
+        overall_acc = self.val_acc_overall.compute()
+        self.log("acc/valid_overall", overall_acc, prog_bar=True)
+        self.val_acc_overall.reset()
 
     def test_step(
         self,
