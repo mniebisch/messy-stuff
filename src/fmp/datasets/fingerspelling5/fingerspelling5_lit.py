@@ -216,6 +216,47 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
             )
 
 
+def validate_additional_valid_keys(
+    image_files: Optional[Dict[str, str]],
+    transforms: Optional[Dict[str, List[_AugmentationBase]]],
+) -> None:
+    """Validate that additional validation datasets and transforms are properly configured."""
+    # Both must be provided together or both None
+    if (image_files is None) != (transforms is None):
+        raise ValueError(
+            "Both 'additional_valid_images_files' and "
+            "'additional_valid_image_transform' must be provided together, or both None."
+        )
+
+    # If both are None, validation passes
+    if image_files is None and transforms is None:
+        return
+
+    # Check that keys match
+    image_keys = set(image_files.keys())
+    transform_keys = set(transforms.keys())
+
+    if image_keys != transform_keys:
+        raise ValueError(
+            f"Keys mismatch between additional datasets and transforms. "
+            f"Image files keys: {image_keys}, Transform keys: {transform_keys}"
+        )
+
+    # Validate file paths exist
+    for dataset_name, csv_path in image_files.items():
+        if not pathlib.Path(csv_path).exists():
+            raise ValueError(f"Additional dataset CSV file not found: {csv_path}")
+
+    # Validate no conflicts with reserved split names
+    reserved_names = {"train_split", "valid_split", "train", "valid"}
+    conflicting_names = image_keys.intersection(reserved_names)
+    if conflicting_names:
+        raise ValueError(
+            f"Additional dataset names conflict with reserved names: {conflicting_names}. "
+            f"Reserved names are: {reserved_names}"
+        )
+
+
 class Fingerspelling5ImageDataModule(L.LightningDataModule):
     def __init__(
         self,
@@ -241,7 +282,13 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         gpu_batch_transforms: Optional[List[_AugmentationBase]] = None,
         cpu_batch_transform_kwargs: Optional[Dict[str, Any]] = None,
         gpu_batch_transform_kwargs: Optional[Dict[str, Any]] = None,
+        additional_valid_images_files: Optional[Dict[str, str]] = None,
+        additional_valid_image_transform: Optional[
+            Dict[str, List[_AugmentationBase]]
+        ] = None,
+        letters: Optional[List[str]] = None,
     ) -> None:
+
         # TODO add validation if required
         # TODO maybe find better name than datasplit file? predict case!?
         super().__init__()
@@ -257,6 +304,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 "kornia_predict_transforms",
                 "cpu_batch_transforms",
                 "gpu_batch_transforms",
+                "additional_valid_image_transform",
             ],
         )
 
@@ -344,6 +392,22 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
 
         self.image_files_csv = self.get_image_files_csv()
 
+        validate_additional_valid_keys(
+            additional_valid_images_files, additional_valid_image_transform
+        )
+
+        self.additional_valid_images_files = (
+            additional_valid_images_files
+            if additional_valid_images_files is not None
+            else {}
+        )
+        self.additional_valid_image_transform = (
+            additional_valid_image_transform
+            if additional_valid_image_transform is not None
+            else {}
+        )
+        self.letters = letters
+
     def setup(self, stage: str) -> None:
         if self.gpu_batch_transforms is not None:
             self.gpu_batch_transforms.to(self.trainer.model.device)
@@ -374,10 +438,11 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
             )
 
             self.train_data = fingerspelling5.Fingerspelling5Image(
-                train_data.iloc[:300],
+                train_data,
                 pathlib.Path(self.images_data_dir),
                 tv_transforms=self.train_transforms,
                 kornia_transforms=self.kornia_train_transforms,
+                letters=self.letters,
             )
 
             self.valid_train_data = fingerspelling5.Fingerspelling5Image(
@@ -386,6 +451,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 tv_transforms=self.valid_transforms,
                 kornia_transforms=self.kornia_valid_transforms,
                 split="train_split",
+                letters=self.letters,
             )
 
             self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
@@ -394,7 +460,35 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 tv_transforms=self.valid_transforms,
                 kornia_transforms=self.kornia_valid_transforms,
                 split="valid_split",
+                letters=self.letters,
             )
+
+            # Create additional validation datasets
+            self.additional_valid_datasets = {}
+            for dataset_name, csv_path in self.additional_valid_images_files.items():
+                # Read the additional dataset
+                additional_data = pd.read_csv(csv_path)
+
+                # Create Kornia transforms for this dataset
+                transform_list = self.additional_valid_image_transform[dataset_name]
+                kornia_transforms = (
+                    K.augmentation.AugmentationSequential(
+                        *transform_list, data_keys=["image"]
+                    )
+                    if transform_list
+                    else None
+                )
+
+                # Create the dataset with the appropriate split name
+                self.additional_valid_datasets[dataset_name] = (
+                    fingerspelling5.Fingerspelling5Image(
+                        additional_data,
+                        pathlib.Path(self.images_data_dir),
+                        kornia_transforms=kornia_transforms,
+                        split=dataset_name,  # Use dataset name as split identifier
+                        letters=self.letters,
+                    )
+                )
         elif stage == "test":
             fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
 
@@ -403,6 +497,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 pathlib.Path(self.images_data_dir),
                 tv_transforms=self.test_transforms,
                 kornia_transforms=self.kornia_test_transforms,
+                letters=self.letters,
             )
         elif stage == "predict":
             fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
@@ -412,6 +507,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 pathlib.Path(self.images_data_dir),
                 tv_transforms=self.predict_transforms,
                 kornia_transforms=self.kornia_predict_transforms,
+                letters=self.letters,
             )
         elif stage == "validate":
             fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
@@ -443,6 +539,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 pathlib.Path(self.images_data_dir),
                 transforms=self.valid_transforms,
                 split="train_split",
+                letters=self.letters,
             )
 
             self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
@@ -450,6 +547,7 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 pathlib.Path(self.images_data_dir),
                 transforms=self.valid_transforms,
                 split="valid_split",
+                letters=self.letters,
             )
         else:
             pass
@@ -484,7 +582,22 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
             drop_last=False,
             num_workers=self.num_dataloader_workers,
         )
-        return [train_loader, valid_loader]
+        # Base validation dataloaders
+        dataloaders = [train_loader, valid_loader]
+
+        # Additional validation datasets
+        if hasattr(self, "additional_valid_datasets"):
+            for dataset_name, dataset in self.additional_valid_datasets.items():
+                additional_loader = torch_data.DataLoader(
+                    dataset,
+                    batch_size=self.batch_size,
+                    shuffle=False,
+                    drop_last=False,
+                    num_workers=self.num_dataloader_workers,
+                )
+                dataloaders.append(additional_loader)
+
+        return dataloaders
 
     def test_dataloader(self) -> torch_data.DataLoader:
         return torch_data.DataLoader(
@@ -829,7 +942,22 @@ class Fingerspelling5ImageInmemoryDataModule(L.LightningDataModule):
             drop_last=False,
             num_workers=self.num_dataloader_workers,
         )
-        return [train_loader, valid_loader]
+        # Base validation dataloaders
+        dataloaders = [train_loader, valid_loader]
+
+        # Additional validation datasets
+        if hasattr(self, "additional_valid_datasets"):
+            for dataset_name, dataset in self.additional_valid_datasets.items():
+                additional_loader = torch_data.DataLoader(
+                    dataset,
+                    batch_size=self.batch_size,
+                    shuffle=False,
+                    drop_last=False,
+                    num_workers=self.num_dataloader_workers,
+                )
+                dataloaders.append(additional_loader)
+
+        return dataloaders
 
     def test_dataloader(self) -> torch_data.DataLoader:
         return torch_data.DataLoader(
