@@ -463,5 +463,45 @@
             "console": "integratedTerminal",
             "justMyCode": false
         },
+        {
+            "name": "MLFlow dev",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_mlflow_basic.py",
+            "args": [
+                "fit",
+                "--config",
+                "${workspaceFolder}/configs/fingerspelling5_singlehands/train_with_mlflow_mixed.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Train ml dev",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/train_mlflow_basic.py",
+            "args": [
+                "fit",
+                "--config",
+                "${workspaceFolder}/configs/fingerspelling5_singlehands/train_with_mlflow_mixed.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Visualize Aug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/visualize_augmentations/visualize_augmentations.py",
+            "args": [
+                "--config",
+                "${workspaceFolder}/configs/fingerspelling5_singlehands/train_with_testing_support.yaml",
+                "--trainer.logger",
+                "False"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
     ]
 }
