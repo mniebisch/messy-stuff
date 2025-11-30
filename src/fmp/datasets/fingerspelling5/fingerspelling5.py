@@ -1,5 +1,5 @@
 import pathlib
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import kornia as K
 import numpy as np
@@ -109,11 +109,12 @@ class Fingerspelling5Image(Dataset):
         tv_transforms: Optional[v2.Transform] = None,
         kornia_transforms: Optional[K.augmentation.AugmentationSequential] = None,
         split: Optional[str] = None,
+        letters: Optional[List[str]] = None,
     ) -> None:
         self.split = split
 
         # fingerspelling5 'properties'
-        self.letters = utils.fingerspelling5.letters
+        self.letters = letters if letters is not None else utils.fingerspelling5.letters
         self.num_letters = len(self.letters)
 
         self._label_transforms = self._setup_label_transforms()
@@ -156,7 +157,8 @@ class Fingerspelling5Image(Dataset):
         if self.kornia_transforms is not None:
             image = self.kornia_transforms(image)
 
-        label = self._label_transforms(self.letters.index(label))
+        label_index = self.letters.index(label)
+        label = self._label_transforms(label_index)
 
         return image, label
 

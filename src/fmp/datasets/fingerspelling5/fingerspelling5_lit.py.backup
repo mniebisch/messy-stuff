@@ -217,8 +217,8 @@ class Fingerspelling5LandmarkDataModule(L.LightningDataModule):
 
 
 def validate_additional_valid_keys(
-    image_files: Optional[Dict[str, str]],
-    transforms: Optional[Dict[str, List[_AugmentationBase]]],
+    image_files: Optional[Dict[str, str]], 
+    transforms: Optional[Dict[str, List[_AugmentationBase]]]
 ) -> None:
     """Validate that additional validation datasets and transforms are properly configured."""
     # Both must be provided together or both None
@@ -227,26 +227,26 @@ def validate_additional_valid_keys(
             "Both 'additional_valid_images_files' and "
             "'additional_valid_image_transform' must be provided together, or both None."
         )
-
+    
     # If both are None, validation passes
     if image_files is None and transforms is None:
         return
-
+    
     # Check that keys match
     image_keys = set(image_files.keys())
     transform_keys = set(transforms.keys())
-
+    
     if image_keys != transform_keys:
         raise ValueError(
             f"Keys mismatch between additional datasets and transforms. "
             f"Image files keys: {image_keys}, Transform keys: {transform_keys}"
         )
-
+    
     # Validate file paths exist
     for dataset_name, csv_path in image_files.items():
         if not pathlib.Path(csv_path).exists():
             raise ValueError(f"Additional dataset CSV file not found: {csv_path}")
-
+    
     # Validate no conflicts with reserved split names
     reserved_names = {"train_split", "valid_split", "train", "valid"}
     conflicting_names = image_keys.intersection(reserved_names)
@@ -286,7 +286,6 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         additional_valid_image_transform: Optional[
             Dict[str, List[_AugmentationBase]]
         ] = None,
-        letters: Optional[List[str]] = None,
     ) -> None:
 
         # TODO add validation if required
@@ -304,7 +303,6 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 "kornia_predict_transforms",
                 "cpu_batch_transforms",
                 "gpu_batch_transforms",
-                "additional_valid_image_transform",
             ],
         )
 
@@ -406,9 +404,6 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
             if additional_valid_image_transform is not None
             else {}
         )
-        self.letters = letters
-
-        self.train_sampler: Optional[torch_data.Sampler] = None
 
     def setup(self, stage: str) -> None:
         if self.gpu_batch_transforms is not None:
@@ -416,130 +411,71 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
 
         if stage == "fit":
             fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
-
-            self.valid_data: List[fingerspelling5.Fingerspelling5Image] = []
-
             if self.datasplit_file is None:
-
-                # def _compute_sampler_weightsa() -> pd.Series:
-                #     dataset_count = fingerspelling5_image_files.groupby(
-                #         "dataset_source"
-                #     )["dataset_source"].count()
-                #     dataset_count.name = "dataset_count"
-                #     dataset_count_mapped = pd.merge(
-                #         fingerspelling5_image_files["dataset_source"],
-                #         dataset_count,
-                #         on="dataset_source",
-                #         how="left",
-                #     )
-                #     return 1 / (
-                #         fingerspelling5_image_files["dataset_source"].nunique()
-                #         * dataset_count_mapped["dataset_count"]
-                #     )
-
-                # self.train_sampler = torch_data.WeightedRandomSampler(
-                #     weights=_compute_sampler_weightsa().values,
-                #     num_samples=len(fingerspelling5_image_files),
-                #     replacement=True,
-                # )
-
-                self.train_data = fingerspelling5.Fingerspelling5Image(
-                    fingerspelling5_image_files,
-                    pathlib.Path(self.images_data_dir),
-                    tv_transforms=self.train_transforms,
-                    kornia_transforms=self.kornia_train_transforms,
-                    letters=self.letters,
+                raise ValueError(
+                    "Fit without 'datasplit_file' not possible. "
+                    "Please provide 'datasplit_file'."
                 )
+            split_data = pd.read_csv(self.datasplit_file)
+            validate_datasplit_data(fingerspelling5_image_files, split_data)
+            train_index, valid_index = load_datasplit_indices(split_data)
 
-                self.valid_data.append(
-                    fingerspelling5.Fingerspelling5Image(
-                        fingerspelling5_image_files,
-                        pathlib.Path(self.images_data_dir),
-                        tv_transforms=self.valid_transforms,
-                        kornia_transforms=self.kornia_valid_transforms,
-                        split="train_split",
-                        letters=self.letters,
-                    )
-                )
-                if self.dataquality_file is not None:
-                    raise ValueError(
-                        "Dataquality file is currently not considered "
-                        "when only providing train split."
-                    )
-            else:
-                split_data = pd.read_csv(self.datasplit_file)
-                validate_datasplit_data(fingerspelling5_image_files, split_data)
-                train_index, valid_index = load_datasplit_indices(split_data)
+            if self.dataquality_file is not None:
+                dataquality_data = pd.read_csv(self.dataquality_file)
+                quality_indices = dataquality_data["is_corrupted"]
 
-                if self.dataquality_file is not None:
-                    dataquality_data = pd.read_csv(self.dataquality_file)
-                    quality_indices = dataquality_data["is_corrupted"]
+                train_index = train_index & ~quality_indices.values
+                valid_index = valid_index & ~quality_indices.values
 
-                    train_index = train_index & ~quality_indices.values
-                    valid_index = valid_index & ~quality_indices.values
+            train_data = fingerspelling5_image_files.loc[train_index].reset_index(
+                drop=True
+            )
+            valid_data = fingerspelling5_image_files.loc[valid_index].reset_index(
+                drop=True
+            )
 
-                train_data = fingerspelling5_image_files.loc[train_index].reset_index(
-                    drop=True
-                )
-                valid_data = fingerspelling5_image_files.loc[valid_index].reset_index(
-                    drop=True
-                )
+            self.train_data = fingerspelling5.Fingerspelling5Image(
+                train_data.iloc[:300],
+                pathlib.Path(self.images_data_dir),
+                tv_transforms=self.train_transforms,
+                kornia_transforms=self.kornia_train_transforms,
+            )
 
-                self.train_data = fingerspelling5.Fingerspelling5Image(
-                    train_data,
-                    pathlib.Path(self.images_data_dir),
-                    tv_transforms=self.train_transforms,
-                    kornia_transforms=self.kornia_train_transforms,
-                    letters=self.letters,
-                )
+            self.valid_train_data = fingerspelling5.Fingerspelling5Image(
+                train_data,
+                pathlib.Path(self.images_data_dir),
+                tv_transforms=self.valid_transforms,
+                kornia_transforms=self.kornia_valid_transforms,
+                split="train_split",
+            )
 
-                self.valid_data.append(
-                    fingerspelling5.Fingerspelling5Image(
-                        train_data,
-                        pathlib.Path(self.images_data_dir),
-                        tv_transforms=self.valid_transforms,
-                        kornia_transforms=self.kornia_valid_transforms,
-                        split="train_split",
-                        letters=self.letters,
-                    )
-                )
-
-                self.valid_data.append(
-                    fingerspelling5.Fingerspelling5Image(
-                        valid_data,
-                        pathlib.Path(self.images_data_dir),
-                        tv_transforms=self.valid_transforms,
-                        kornia_transforms=self.kornia_valid_transforms,
-                        split="valid_split",
-                        letters=self.letters,
-                    )
-                )
-
+            self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
+                valid_data,
+                pathlib.Path(self.images_data_dir),
+                tv_transforms=self.valid_transforms,
+                kornia_transforms=self.kornia_valid_transforms,
+                split="valid_split",
+            )
+            
             # Create additional validation datasets
             self.additional_valid_datasets = {}
             for dataset_name, csv_path in self.additional_valid_images_files.items():
                 # Read the additional dataset
                 additional_data = pd.read_csv(csv_path)
-
+                
                 # Create Kornia transforms for this dataset
                 transform_list = self.additional_valid_image_transform[dataset_name]
-                kornia_transforms = (
-                    K.augmentation.AugmentationSequential(
-                        *transform_list, data_keys=["image"]
-                    )
-                    if transform_list
-                    else None
-                )
-
+                kornia_transforms = K.augmentation.AugmentationSequential(
+                    *transform_list, data_keys=["image"]
+                ) if transform_list else None
+                
                 # Create the dataset with the appropriate split name
-                self.additional_valid_datasets[dataset_name] = (
-                    fingerspelling5.Fingerspelling5Image(
-                        additional_data,
-                        pathlib.Path(self.images_data_dir),
-                        kornia_transforms=kornia_transforms,
-                        split=dataset_name,  # Use dataset name as split identifier
-                        letters=self.letters,
-                    )
+                self.additional_valid_datasets[dataset_name] = fingerspelling5.Fingerspelling5Image(
+                    additional_data,
+                    pathlib.Path(self.images_data_dir),
+                    tv_transforms=self.valid_transforms,  # Use same base transforms
+                    kornia_transforms=kornia_transforms,
+                    split=dataset_name,  # Use dataset name as split identifier
                 )
         elif stage == "test":
             fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
@@ -549,7 +485,6 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 pathlib.Path(self.images_data_dir),
                 tv_transforms=self.test_transforms,
                 kornia_transforms=self.kornia_test_transforms,
-                letters=self.letters,
             )
         elif stage == "predict":
             fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
@@ -559,7 +494,6 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 pathlib.Path(self.images_data_dir),
                 tv_transforms=self.predict_transforms,
                 kornia_transforms=self.kornia_predict_transforms,
-                letters=self.letters,
             )
         elif stage == "validate":
             fingerspelling5_image_files = pd.read_csv(self.image_files_csv)
@@ -586,28 +520,18 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
                 drop=True
             )
 
-            self.valid_data = []
-
-            self.valid_data.append(
-                fingerspelling5.Fingerspelling5Image(
-                    train_data,
-                    pathlib.Path(self.images_data_dir),
-                    tv_transforms=self.valid_transforms,
-                    kornia_transforms=self.kornia_valid_transforms,
-                    split="train_split",
-                    letters=self.letters,
-                )
+            self.valid_train_data = fingerspelling5.Fingerspelling5Image(
+                train_data,
+                pathlib.Path(self.images_data_dir),
+                transforms=self.valid_transforms,
+                split="train_split",
             )
 
-            self.valid_data.append(
-                fingerspelling5.Fingerspelling5Image(
-                    valid_data,
-                    pathlib.Path(self.images_data_dir),
-                    tv_transforms=self.valid_transforms,
-                    kornia_transforms=self.kornia_valid_transforms,
-                    split="valid_split",
-                    letters=self.letters,
-                )
+            self.valid_valid_data = fingerspelling5.Fingerspelling5Image(
+                valid_data,
+                pathlib.Path(self.images_data_dir),
+                transforms=self.valid_transforms,
+                split="valid_split",
             )
         else:
             pass
@@ -616,44 +540,33 @@ class Fingerspelling5ImageDataModule(L.LightningDataModule):
         pass
 
     def train_dataloader(self) -> torch_data.DataLoader:
-        shuffle = True if self.train_sampler is None else None
         return torch_data.DataLoader(
             self.train_data,
             batch_size=self.batch_size,
-            shuffle=shuffle,
+            shuffle=True,
             drop_last=True,
             num_workers=self.num_dataloader_workers,
             persistent_workers=True,
             pin_memory=True,
             # prefetch_factor=1,
-            sampler=self.train_sampler,
         )
 
     def val_dataloader(self) -> List[torch_data.DataLoader]:
-        dataloaders = [
-            torch_data.DataLoader(
-                valid_data,
-                batch_size=self.batch_size,
-                shuffle=False,
-                drop_last=False,
-                num_workers=self.num_dataloader_workers,
-            )
-            for valid_data in self.valid_data
-        ]
-
-        # Additional validation datasets
-        if hasattr(self, "additional_valid_datasets"):
-            for dataset_name, dataset in self.additional_valid_datasets.items():
-                additional_loader = torch_data.DataLoader(
-                    dataset,
-                    batch_size=self.batch_size,
-                    shuffle=False,
-                    drop_last=False,
-                    num_workers=self.num_dataloader_workers,
-                )
-                dataloaders.append(additional_loader)
-
-        return dataloaders
+        train_loader = torch_data.DataLoader(
+            self.valid_train_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_dataloader_workers,
+        )
+        valid_loader = torch_data.DataLoader(
+            self.valid_valid_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_dataloader_workers,
+        )
+        return [train_loader, valid_loader]
 
     def test_dataloader(self) -> torch_data.DataLoader:
         return torch_data.DataLoader(
@@ -998,22 +911,7 @@ class Fingerspelling5ImageInmemoryDataModule(L.LightningDataModule):
             drop_last=False,
             num_workers=self.num_dataloader_workers,
         )
-        # Base validation dataloaders
-        dataloaders = [train_loader, valid_loader]
-
-        # Additional validation datasets
-        if hasattr(self, "additional_valid_datasets"):
-            for dataset_name, dataset in self.additional_valid_datasets.items():
-                additional_loader = torch_data.DataLoader(
-                    dataset,
-                    batch_size=self.batch_size,
-                    shuffle=False,
-                    drop_last=False,
-                    num_workers=self.num_dataloader_workers,
-                )
-                dataloaders.append(additional_loader)
-
-        return dataloaders
+        return [train_loader, valid_loader]
 
     def test_dataloader(self) -> torch_data.DataLoader:
         return torch_data.DataLoader(
