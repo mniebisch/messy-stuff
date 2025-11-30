@@ -132,3 +132,8 @@ python pipelies/fingerspelling5/train_eval.py \
 - Devcontainer Features
     - [Repo](https://github.com/devcontainers/features/tree/main/src)
     - [VSCode mention](https://code.visualstudio.com/docs/devcontainers/containers#_dev-container-features)
+
+
+source .venv/bin/activate && python scripts/train_mlflow_basic.py fit --config configs/fingerspelling5_singlehands/train_with_mlflow.yaml 
+
+mlflow ui --backend-store-uri sqlite:///mlruns.db --default-artifact-root ./artifacts
