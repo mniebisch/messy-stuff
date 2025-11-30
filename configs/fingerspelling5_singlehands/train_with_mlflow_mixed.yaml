@@ -1,0 +1,222 @@
+# Enhanced training config for linking to future test runs
+# This adds run_type and stage tags to support testing workflow
+
+seed_everything: false
+
+trainer:
+  # Debug mode: run just 1 batch for 1 epoch with full logging
+  # limit_train_batches: 2 # augmentation debug logging only
+  # limit_val_batches: 1 # augmentation debug logging only
+  max_epochs: 35
+  log_every_n_steps: 1
+  check_val_every_n_epoch: 1
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: epoch
+    - class_path: fmp.lit_tools.callbacks.mlflow.MLFlowModelCheckpoint
+      init_args:
+        dirpath: ./checkpoints
+        monitor: acc/valid_overall
+        mode: max
+        save_top_k: 30
+        log_top_k_as_artifacts: true
+        log_best_as_artifact: false
+        log_improvement_history: false
+    # - class_path: fmp.lit_tools.callbacks.mlflow.MLFlowImageLogger # augmentation debug logging only
+    #   init_args:
+    #     log_every_n_epochs: 2 # Log every 2 epochs
+    #     max_images_per_batch: 32 # Just 4 images per epoch
+    #     denormalize: true
+    #     normalize_mean: [0.5342, 0.4953, 0.4969]
+    #     normalize_std: [0.2038, 0.2137, 0.2114]
+    #     artifact_path: "training_images"
+  logger:
+    class_path: lightning.pytorch.loggers.MLFlowLogger
+    init_args:
+      experiment_name: fingerspelling5 # Training experiments
+      tracking_uri: "sqlite:///mlruns.db"
+      tags:
+        # Workflow tags
+        run_type: training # augmentation_debug # Mark as training run
+
+        # Original tags
+        project: fingerspelling5
+        data_version: mixed_with_background
+        data_type: image
+
+model:
+  class_path: fmp.models.ResNetClassifier
+  init_args:
+    model:
+      class_path: fmp.models.ResNet18
+      init_args:
+        num_classes: 3 #24
+
+data:
+  class_path: fmp.datasets.fingerspelling5.Fingerspelling5ImageDataModule
+  init_args:
+    dataset_dir: ./data/fingerspelling5/mixed__cly
+    images_data_dir: ../../data/
+    batch_size: 32
+    num_dataloader_workers: 23
+    letters: ["c", "l", "y"]
+    train_transforms:
+      class_path: torchvision.transforms.v2.Compose
+      init_args:
+        transforms:
+          - class_path: torchvision.transforms.v2.ToImage
+          - class_path: torchvision.transforms.v2.RandomErasing
+            init_args:
+              p: 0.33
+              scale: [0.02, 0.1]
+              ratio: [0.3, 3.3]
+          - class_path: fmp.transforms.ScaleJitter
+            init_args:
+              target_size: [300, 300]
+              scale_range: [0.25, 2.0]
+          - class_path: fmp.transforms.BackgroundImage
+            init_args:
+              data_root: ../../data/lsun
+              image_transforms:
+                class_path: torchvision.transforms.v2.Compose
+                init_args:
+                  transforms:
+                    - class_path: torchvision.transforms.v2.ToImage
+          - class_path: fmp.transforms.CropOrPad
+            init_args:
+              target_size: [450, 450]
+          - class_path: torchvision.transforms.v2.ToDtype
+            init_args:
+              dtype:
+                class_path: torch.float32
+              scale: true
+          - class_path: torchvision.transforms.v2.ToPureTensor
+    kornia_train_transforms:
+      - class_path: kornia.augmentation.RandomElasticTransform
+        init_args:
+          alpha: [1, 2]
+          sigma: [32, 32]
+    kornia_train_transform_kwargs:
+      keepdim: true
+    valid_transforms:
+      class_path: torchvision.transforms.v2.Compose
+      init_args:
+        transforms:
+          - class_path: torchvision.transforms.v2.ToImage
+          - class_path: torchvision.transforms.v2.ToDtype
+            init_args:
+              dtype:
+                class_path: torch.float32
+              scale: true
+          - class_path: torchvision.transforms.v2.Normalize
+            init_args:
+              mean: [0.5342, 0.4953, 0.4969]
+              std: [0.2038, 0.2137, 0.2114]
+          - class_path: fmp.transforms.PadToSize
+            init_args:
+              size: 416
+          - class_path: torchvision.transforms.v2.ToPureTensor
+    gpu_batch_transforms:
+      - class_path: kornia.augmentation.RandomHorizontalFlip
+        init_args:
+          p: 0.5
+      - class_path: kornia.augmentation.ColorJiggle
+        init_args:
+          brightness: 0.15
+          contrast: 0.15
+          saturation: 0.15
+          hue: 0.2
+          p: 0.75
+      - class_path: kornia.augmentation.RandomEqualize
+        init_args:
+          p: 0.33
+      - class_path: kornia.augmentation.RandomSolarize
+        init_args:
+          thresholds: [0.5, 0.8]
+          p: 0.1
+      - class_path: kornia.augmentation.RandomPosterize
+        init_args:
+          bits: [4, 8]
+          p: 0.25
+      - class_path: kornia.augmentation.RandomAffine
+        init_args:
+          degrees: 30
+          translate: [0.1, 0.1]
+          # scale: [0.9, 1.1]
+          shear: 10
+      - class_path: kornia.augmentation.RandomPerspective
+        init_args:
+          distortion_scale: 0.25
+          p: 0.33
+      - class_path: kornia.augmentation.RandomMotionBlur
+        init_args:
+          kernel_size: [3, 9]
+          angle: [-30, 30]
+          direction: [-0.5, 0.5]
+          p: 0.33
+      - class_path: kornia.augmentation.RandomGaussianNoise
+        init_args:
+          std: 0.02
+          p: 0.3
+      - class_path: kornia.augmentation.Normalize
+        init_args:
+          mean: [0.5342, 0.4953, 0.4969]
+          std: [0.2038, 0.2137, 0.2114]
+    additional_valid_images_files:
+      valid_mendeley: "./data/fingerspelling5/mixed__cly/mendeley__cly_valid_split.csv"
+      valid_kaggle: "./data/fingerspelling5/mixed__cly/kaggle__cly_valid_split.csv"
+      valid_roboflow: "./data/fingerspelling5/mixed__cly/roboflow__cly_valid_split.csv"
+      valid_kaggle2: "./data/fingerspelling5/mixed__cly/kaggle2__cly_valid_split.csv"
+      valid_fingerspelling5: "./data/fingerspelling5/mixed__cly/fingerspelling5__cly_valid_split.csv"
+    additional_valid_image_transform:
+      valid_mendeley:
+        - class_path: kornia.augmentation.Normalize
+          init_args:
+            mean: [0.5342, 0.4953, 0.4969]
+            std: [0.2038, 0.2137, 0.2114]
+            keepdim: true
+      valid_kaggle:
+        - class_path: kornia.augmentation.Normalize
+          init_args:
+            mean: [0.5342, 0.4953, 0.4969]
+            std: [0.2038, 0.2137, 0.2114]
+            keepdim: true
+      valid_roboflow:
+        - class_path: kornia.augmentation.Normalize
+          init_args:
+            mean: [0.5342, 0.4953, 0.4969]
+            std: [0.2038, 0.2137, 0.2114]
+            keepdim: true
+        - class_path: kornia.augmentation.PadTo
+          init_args:
+            size: [416, 416]
+            keepdim: true
+      valid_kaggle2:
+        - class_path: kornia.augmentation.Normalize
+          init_args:
+            mean: [0.5342, 0.4953, 0.4969]
+            std: [0.2038, 0.2137, 0.2114]
+            keepdim: true
+      valid_fingerspelling5:
+        - class_path: kornia.augmentation.Normalize
+          init_args:
+            mean: [0.5342, 0.4953, 0.4969]
+            std: [0.2038, 0.2137, 0.2114]
+            keepdim: true
+        - class_path: kornia.augmentation.PadTo
+          init_args:
+            size: [272, 272]
+            keepdim: true
+
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 0.0005 # 0.01
+
+lr_scheduler:
+  class_path: fmp.lr_schedulers.cosine_annealing_warmup
+  init_args:
+    warmup_iters: 5
+    warmup_factor: 0.01
+    total_iters: 35
