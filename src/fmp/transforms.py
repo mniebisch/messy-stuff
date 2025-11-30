@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import torch
 import torchvision
+from matplotlib import scale
 from numpy import typing as npt
 from PIL import Image
 from scipy.signal import convolve2d
@@ -19,6 +20,7 @@ __all__ = [
     "FXAALite",
     "PadToSize",
     "ScaleJitter",
+    "ScaleJitterXY",
 ]
 
 
@@ -64,7 +66,7 @@ class PadToSize(v2.Pad):
 
 
 class ScaleJitter(v2.ScaleJitter):
-    def _get_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
+    def make_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
         orig_height, orig_width = v2.query_size(flat_inputs)
 
         scale = self.scale_range[0] + torch.rand(1) * (
@@ -72,6 +74,24 @@ class ScaleJitter(v2.ScaleJitter):
         )
         new_width = int(orig_width * scale)
         new_height = int(orig_height * scale)
+
+        return dict(size=(new_height, new_width))
+
+
+class ScaleJitterXY(v2.ScaleJitter):
+    def make_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
+        orig_height, orig_width = v2.query_size(flat_inputs)
+
+        random_value = torch.rand(2)
+        scale_x = self.scale_range[0] + random_value[0] * (
+            self.scale_range[1] - self.scale_range[0]
+        )
+        scale_y = self.scale_range[0] + random_value[1] * (
+            self.scale_range[1] - self.scale_range[0]
+        )
+
+        new_width = int(orig_width * scale_x)
+        new_height = int(orig_height * scale_y)
 
         return dict(size=(new_height, new_width))
 
