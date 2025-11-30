@@ -65,6 +65,10 @@ class ResNetClassifier(L.LightningModule):
         images, labels = batch
         outputs = self(images)
         loss = F.cross_entropy(outputs, labels)
+        # labels = torch.argmax(labels, dim=1)
+        # loss = K.losses.focal_loss(
+        #     outputs, labels, alpha=0.25, gamma=2.0, reduction="mean"
+        # )
 
         self.log("loss", loss)
         return loss
