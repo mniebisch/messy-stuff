@@ -32,10 +32,14 @@ trainer:
     #     normalize_std: [0.2038, 0.2137, 0.2114]
     #     artifact_path: "training_images"
   logger:
-    class_path: lightning.pytorch.loggers.MLFlowLogger
+    # Use custom logger for system metrics (CPU/GPU/memory tracking)
+    class_path: fmp.lit_tools.callbacks.mlflow.MLFlowSystemMetricsLogger
     init_args:
       experiment_name: fingerspelling5 # Training experiments
       tracking_uri: "sqlite:///mlruns.db"
+      artifact_location: "./mlruns"
+      log_system_metrics: true  # Enable CPU/GPU/memory tracking
+      synchronous: true  # Flush metrics immediately (slower but real-time UI updates)
       tags:
         # Workflow tags
         run_type: training # augmentation_debug # Mark as training run
@@ -57,7 +61,7 @@ data:
   class_path: fmp.datasets.fingerspelling5.Fingerspelling5ImageDataModule
   init_args:
     dataset_dir: ./data/fingerspelling5/mixed__cly
-    images_data_dir: ../../data/
+    images_data_dir: /mnt/data/
     batch_size: 32
     num_dataloader_workers: 23
     letters: ["c", "l", "y"]
@@ -77,7 +81,7 @@ data:
               scale_range: [0.25, 2.0]
           - class_path: fmp.transforms.BackgroundImage
             init_args:
-              data_root: ../../data/lsun
+              data_root: /mnt/data/lsun
               image_transforms:
                 class_path: torchvision.transforms.v2.Compose
                 init_args:

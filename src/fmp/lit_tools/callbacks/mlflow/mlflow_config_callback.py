@@ -3,14 +3,37 @@ Unified MLFlow configuration callback for PyTorch Lightning.
 
 This module provides a single, comprehensive callback that handles all configuration
 logging needs for MLFlow, replacing the previous separate callbacks.
+
+Features:
+    - Saves config to local filesystem (organized by MLFlow run ID)
+    - Logs config as MLFlow artifact for experiment reproducibility
+    - Sets MLFlow tags for filtering and metadata queries
+    - Supports both CLI-generated and custom configs
+    - Optional config hashing for duplicate detection
+
+Example:
+    >>> from lightning.pytorch.cli import LightningCLI
+    >>> from fmp.lit_tools.callbacks.mlflow import MLFlowConfigCallback
+    >>>
+    >>> LightningCLI(
+    ...     save_config_callback=MLFlowConfigCallback,
+    ...     save_config_kwargs={
+    ...         "logdir": "./config_logs",
+    ...         "artifact_path": "configs",
+    ...         "log_as_artifact": True,
+    ...     },
+    ... )
 """
+
+from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import lightning as L
 from lightning.fabric.utilities.cloud_io import get_filesystem
@@ -20,22 +43,37 @@ from typing_extensions import override
 
 __all__ = ["MLFlowConfigCallback"]
 
+logger = logging.getLogger(__name__)
+
 
 class MLFlowConfigCallback(SaveConfigCallback):
-    """
-    Unified configuration callback for MLFlow logging.
+    """Unified configuration callback for MLFlow logging.
 
-    This callback combines the functionality of config saving and MLFlow logging:
-    1. Saves config to local filesystem (organized by run ID)
-    2. Logs config as MLFlow artifact
-    3. Sets MLFlow tags for filtering and metadata
-    4. Supports both CLI-generated and custom configs
-    5. Optional config hashing for duplicate detection (disabled by default)
+    This callback combines the functionality of config saving and MLFlow logging,
+    providing a comprehensive solution for experiment configuration management.
+
+    Features:
+        1. Saves config to local filesystem (organized by run ID)
+        2. Logs config as MLFlow artifact
+        3. Sets MLFlow tags for filtering and metadata
+        4. Supports both CLI-generated and custom configs
+        5. Optional config hashing for duplicate detection (disabled by default)
+
+    Note:
+        This callback is designed to be used as the ``save_config_callback`` parameter
+        of :class:`~lightning.pytorch.cli.LightningCLI`. It extends
+        :class:`~lightning.pytorch.cli.SaveConfigCallback` to add MLFlow-specific
+        functionality.
+
+    Attributes:
+        logdir: Resolved path to local config directory.
+        artifact_path: Path within MLFlow artifacts for config storage.
+        config_filename: Name of the saved config file.
     """
 
     def __init__(
         self,
-        *args,
+        *args: Any,
         # Local filesystem options
         logdir: str = "./config_logs",
         # MLFlow artifact options
@@ -44,26 +82,30 @@ class MLFlowConfigCallback(SaveConfigCallback):
         log_as_artifact: bool = True,
         # MLFlow tagging options
         tag_prefix: str = "config",
-        log_config_hash: bool = False,  # Disabled by default - MLFlow run ID provides uniqueness
+        log_config_hash: bool = False,
         log_summary_tags: bool = True,
         # Additional config options
-        resolved_config: Optional[Dict[str, Any]] = None,
+        resolved_config: dict[str, Any] | None = None,
         log_resolved_config: bool = True,
         pretty_json: bool = True,
-        **kwargs,
-    ):
-        """
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the MLFlow configuration callback.
+
         Args:
-            logdir: Local directory to save configs (organized by run ID)
-            artifact_path: Path within MLFlow artifacts to store config
-            config_filename: Name of the main config file
-            log_as_artifact: Whether to log config as MLFlow artifact
-            tag_prefix: Prefix for MLFlow tags
-            log_config_hash: Whether to compute and log config hash (optional - MLFlow run ID already provides uniqueness)
-            log_summary_tags: Whether to log summary information as tags
-            resolved_config: Additional resolved config to log (from CLI)
-            log_resolved_config: Whether to log the resolved config as JSON
-            pretty_json: Whether to format JSON with indentation
+            *args: Positional arguments passed to parent SaveConfigCallback.
+            logdir: Local directory to save configs (organized by run ID).
+            artifact_path: Path within MLFlow artifacts to store config.
+            config_filename: Name of the main config file.
+            log_as_artifact: Whether to log config as MLFlow artifact.
+            tag_prefix: Prefix for MLFlow tags (e.g., "config.model").
+            log_config_hash: Whether to compute and log config hash.
+                Disabled by default since MLFlow run ID provides uniqueness.
+            log_summary_tags: Whether to log summary information as tags.
+            resolved_config: Additional resolved config dict to log (from CLI).
+            log_resolved_config: Whether to log the resolved config as JSON.
+            pretty_json: Whether to format JSON with indentation.
+            **kwargs: Keyword arguments passed to parent SaveConfigCallback.
         """
         super().__init__(*args, **kwargs)
 
@@ -111,18 +153,31 @@ class MLFlowConfigCallback(SaveConfigCallback):
     def _setup_local_saving(
         self, trainer: L.Trainer, pl_module: L.LightningModule, stage: str
     ) -> None:
-        """Handle local filesystem config saving with run ID organization."""
+        """Handle local filesystem config saving with run ID organization.
+
+        Args:
+            trainer: The PyTorch Lightning trainer instance.
+            pl_module: The LightningModule being trained.
+            stage: Current stage ('fit', 'validate', 'test', 'predict').
+        """
         if not self.save_to_log_dir:
             return
 
         # Get MLFlow logger and run ID
         mlflow_logger = self._get_mlflow_logger(trainer)
-        if not mlflow_logger:
+        if mlflow_logger is None:
             # Fall back to original behavior if no MLFlow logger
             super().setup(trainer, pl_module, stage)
             return
 
         run_id = mlflow_logger.run_id
+        if run_id is None:
+            logger.warning(
+                "MLFlow run_id is None, falling back to default SaveConfigCallback behavior"
+            )
+            super().setup(trainer, pl_module, stage)
+            return
+
         log_dir = str(self.logdir / run_id)
         config_path = os.path.join(log_dir, self.config_filename)
         fs = get_filesystem(log_dir)
@@ -159,7 +214,13 @@ class MLFlowConfigCallback(SaveConfigCallback):
         self.already_saved = trainer.strategy.broadcast(self.already_saved)
 
     def _setup_mlflow_logging(self, trainer: L.Trainer) -> None:
-        """Handle MLFlow logging of configuration."""
+        """Handle MLFlow logging of configuration.
+
+        Logs the config as artifact, resolved config if provided, and summary tags.
+
+        Args:
+            trainer: The PyTorch Lightning trainer instance.
+        """
         if not trainer.is_global_zero:
             return
 
@@ -184,29 +245,48 @@ class MLFlowConfigCallback(SaveConfigCallback):
         if self.log_summary_tags:
             self._log_summary_tags(mlflow_logger)
 
-    def _get_mlflow_logger(self, trainer: L.Trainer) -> Optional[MLFlowLogger]:
-        """Get MLFlow logger from trainer."""
+    def _get_mlflow_logger(self, trainer: L.Trainer) -> MLFlowLogger | None:
+        """Extract MLFlow logger from trainer.
+
+        Args:
+            trainer: The PyTorch Lightning trainer instance.
+
+        Returns:
+            The MLFlowLogger if found, None otherwise.
+        """
+        if trainer.logger is None:
+            return None
+
         if isinstance(trainer.logger, MLFlowLogger):
             return trainer.logger
 
-        # Check if logger is a list/tuple and contains MLFlow logger
+        # Check if logger is iterable (e.g., list of loggers)
         if hasattr(trainer.logger, "__iter__"):
-            for logger in trainer.logger:
-                if isinstance(logger, MLFlowLogger):
-                    return logger
+            for log_instance in trainer.logger:
+                if isinstance(log_instance, MLFlowLogger):
+                    return log_instance
 
         return None
 
     def _log_config_as_artifact(
-        self, logger: MLFlowLogger, config: Any, filename: str
+        self, mlflow_logger: MLFlowLogger, config: Any, filename: str
     ) -> None:
-        """Log configuration as MLFlow artifact."""
+        """Log configuration as MLFlow artifact.
+
+        Args:
+            mlflow_logger: The MLFlow logger instance.
+            config: The configuration to log.
+            filename: Name for the artifact file.
+
+        Raises:
+            RuntimeError: If artifact logging fails and error handling is not possible.
+        """
         temp_dir = tempfile.TemporaryDirectory()
         try:
             config_path = Path(temp_dir.name) / filename
 
             # Save config to temporary file
-            if hasattr(self, "parser") and self.parser:
+            if hasattr(self, "parser") and self.parser is not None:
                 # Use parser to save in original format
                 self.parser.save(config, str(config_path), skip_none=False)
             else:
@@ -219,8 +299,13 @@ class MLFlowConfigCallback(SaveConfigCallback):
                 )
 
             # Log as artifact
-            logger.experiment.log_artifact(
-                run_id=logger.run_id,
+            run_id = mlflow_logger.run_id
+            if run_id is None:
+                logger.warning("Cannot log artifact: MLFlow run_id is None")
+                return
+
+            mlflow_logger.experiment.log_artifact(
+                run_id=run_id,
                 local_path=str(config_path),
                 artifact_path=self.artifact_path,
             )
@@ -228,18 +313,31 @@ class MLFlowConfigCallback(SaveConfigCallback):
             # Log hash if enabled
             if self.log_config_hash:
                 config_hash = self._compute_config_hash(config)
-                logger.experiment.set_tag(
-                    logger.run_id, f"{self.tag_prefix}.hash", config_hash
+                mlflow_logger.experiment.set_tag(
+                    run_id, f"{self.tag_prefix}.hash", config_hash
                 )
 
+        except Exception as e:
+            logger.error(f"Failed to log config as artifact: {e}")
+            raise
         finally:
             temp_dir.cleanup()
 
     def _log_resolved_config_as_artifact(
-        self, logger: MLFlowLogger, filename: str
+        self, mlflow_logger: MLFlowLogger, filename: str
     ) -> None:
-        """Log resolved configuration as JSON artifact."""
+        """Log resolved configuration as JSON artifact.
+
+        Args:
+            mlflow_logger: The MLFlow logger instance.
+            filename: Name for the artifact file.
+        """
         if not self.resolved_config:
+            return
+
+        run_id = mlflow_logger.run_id
+        if run_id is None:
+            logger.warning("Cannot log resolved config: MLFlow run_id is None")
             return
 
         temp_dir = tempfile.TemporaryDirectory()
@@ -256,8 +354,8 @@ class MLFlowConfigCallback(SaveConfigCallback):
             config_path.write_text(json_str, encoding="utf-8")
 
             # Log as artifact
-            logger.experiment.log_artifact(
-                run_id=logger.run_id,
+            mlflow_logger.experiment.log_artifact(
+                run_id=run_id,
                 local_path=str(config_path),
                 artifact_path=self.artifact_path,
             )
@@ -265,16 +363,29 @@ class MLFlowConfigCallback(SaveConfigCallback):
             # Log resolved config hash
             if self.log_config_hash:
                 config_hash = hashlib.sha256(json_str.encode()).hexdigest()
-                logger.experiment.set_tag(
-                    logger.run_id, f"{self.tag_prefix}.resolved_hash", config_hash
+                mlflow_logger.experiment.set_tag(
+                    run_id, f"{self.tag_prefix}.resolved_hash", config_hash
                 )
 
+        except Exception as e:
+            logger.error(f"Failed to log resolved config as artifact: {e}")
         finally:
             temp_dir.cleanup()
 
-    def _log_summary_tags(self, logger: MLFlowLogger) -> None:
-        """Log summary information as MLFlow tags."""
-        tags = {}
+    def _log_summary_tags(self, mlflow_logger: MLFlowLogger) -> None:
+        """Log summary information as MLFlow tags.
+
+        Extracts key information from config and logs as searchable tags.
+
+        Args:
+            mlflow_logger: The MLFlow logger instance.
+        """
+        run_id = mlflow_logger.run_id
+        if run_id is None:
+            logger.warning("Cannot log summary tags: MLFlow run_id is None")
+            return
+
+        tags: dict[str, str] = {}
 
         # Log from main config if available
         if hasattr(self, "config") and self.config:
@@ -292,10 +403,20 @@ class MLFlowConfigCallback(SaveConfigCallback):
 
         # Set all tags
         for tag_key, tag_value in tags.items():
-            logger.experiment.set_tag(logger.run_id, tag_key, tag_value)
+            try:
+                mlflow_logger.experiment.set_tag(run_id, tag_key, tag_value)
+            except Exception as e:
+                logger.warning(f"Failed to set tag {tag_key}: {e}")
 
     def _compute_config_hash(self, config: Any) -> str:
-        """Compute hash of configuration."""
+        """Compute SHA-256 hash of configuration.
+
+        Args:
+            config: The configuration object to hash.
+
+        Returns:
+            Hexadecimal hash string of the configuration.
+        """
         try:
             # Convert to JSON string for consistent hashing
             json_str = json.dumps(config, sort_keys=True, default=str)
@@ -304,9 +425,16 @@ class MLFlowConfigCallback(SaveConfigCallback):
             # Fallback to string representation
             return hashlib.sha256(str(config).encode()).hexdigest()
 
-    def _extract_config_summary(self, config: Any) -> Dict[str, Any]:
-        """Extract summary information from main config."""
-        summary = {}
+    def _extract_config_summary(self, config: Any) -> dict[str, Any]:
+        """Extract summary information from main config.
+
+        Args:
+            config: The configuration object (can be dict or namespace).
+
+        Returns:
+            Dictionary with extracted summary key-value pairs.
+        """
+        summary: dict[str, Any] = {}
 
         # Try to extract common config elements
         if hasattr(config, "__dict__"):
@@ -330,10 +458,17 @@ class MLFlowConfigCallback(SaveConfigCallback):
         return summary
 
     def _extract_resolved_config_summary(
-        self, config: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Extract summary information from resolved config."""
-        summary = {}
+        self, config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Extract summary information from resolved config.
+
+        Args:
+            config: The resolved configuration dictionary.
+
+        Returns:
+            Dictionary with extracted summary key-value pairs.
+        """
+        summary: dict[str, Any] = {}
 
         # Extract key paths and parameters
         for section in ["model", "data", "trainer", "optimizer", "lr_scheduler"]:
