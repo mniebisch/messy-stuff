@@ -3,6 +3,7 @@ from fmp.models.lit_mlp import LitMLP, SingleLayerMLP
 from fmp.models.lit_resnet import ResNetClassifier
 from fmp.models.mlp import MLP
 from fmp.models.resnet18 import ResNet18
+from fmp.models.unet import SphereSliceUNetModule
 
 __all__ = [
     "Identity",
@@ -11,4 +12,5 @@ __all__ = [
     "ResNetClassifier",
     "SingleLayerMLP",
     "ResNet18",
+    "SphereSliceUNetModule",
 ]
