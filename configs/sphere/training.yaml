@@ -1,0 +1,79 @@
+seed_everything: 42 # false
+
+trainer:
+  max_epochs: 30
+  log_every_n_steps: 50
+  check_val_every_n_epoch: 1
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: epoch
+    - class_path: fmp.lit_tools.callbacks.mlflow.MLFlowModelCheckpoint
+      init_args:
+        dirpath: ./checkpoints
+        monitor: val/loss
+        mode: min
+        save_top_k: 3
+        log_top_k_as_artifacts: true
+        log_best_as_artifact: false
+        log_improvement_history: false
+  logger:
+    class_path: fmp.lit_tools.callbacks.mlflow.MLFlowSystemMetricsLogger
+    init_args:
+      experiment_name: sphere
+      tracking_uri: "sqlite:///mlruns.db"
+      artifact_location: "file:./mlruns"
+      log_system_metrics: true  # Enable CPU/GPU/memory tracking
+      synchronous: true  # Flush metrics immediately (slower but real-time UI updates)
+      tags:
+        run_type: training
+        project: sphere
+model:
+  class_path: fmp.models.SphereSliceUNetModule
+  init_args:
+    in_channels: 15
+    out_channels: 1
+    output_activation: "sigmoid"
+    encoder_name: "resnet18"
+    encoder_weights: null
+    huber_beta: 0.1
+    grad_weight: 0.1
+    pos_weight: 8.0
+    use_value_weight: false
+    value_weight_alpha: 0.0
+    value_weight_gamma: 1.0
+data:
+  class_path: fmp.datasets.sphere.SphereDataModule
+  init_args:
+    train_ranges:
+      height: [100, 100] # [100, 250]
+      width: [100, 100] # [100, 250]
+      depth: [3, 8]
+      pixel_size: [0.5, 2.0]
+      radius: [20.0, 50.0] # [6.0, 50.0]
+      z_index: 0
+    valA_ranges:
+      height: [100, 100] # [100, 250]
+      width: [100, 100] # [100, 250]
+      depth: [3, 8]
+      pixel_size: [0.5, 2.0]
+      radius: [20.0, 50.0] # [6.0, 50.0]
+      z_index: 0
+    train_length: 10000 # 100000
+    valA_num: 2000  #20000
+    crop_size: [100, 100]
+    batch_size: 32
+    num_workers: 4
+    normalize: true
+    normalize_radius: false
+    add_center_maps: false
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 1e-3
+lr_scheduler:
+  class_path: fmp.lr_schedulers.cosine_annealing_warmup
+  init_args:
+    warmup_iters: 3
+    warmup_factor: 0.01
+    total_iters: 30
