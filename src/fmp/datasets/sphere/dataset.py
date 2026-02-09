@@ -7,6 +7,8 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, get_worker_info
 
+from fmp.datasets.sphere import sampling as sphere_sampling
+
 __all__ = [
     "OnTheFlySphereSliceDataset",
     "FixedSphereSliceDataset",
@@ -215,7 +217,7 @@ def make_slice_and_unet_input(
 # -------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class SphereSliceConfig:
     height: int
     width: int
@@ -241,31 +243,68 @@ class SphereSliceRanges:
 
 
 def _rand_int(rng: np.random.Generator, lo: int, hi: int) -> int:
-    # inclusive bounds
     return int(rng.integers(lo, hi + 1))
 
 
 def sample_config(
     rng: np.random.Generator,
     ranges: SphereSliceRanges,
+    sampling: Optional[sphere_sampling.SamplingConfig] = None,
 ) -> SphereSliceConfig:
-    h = _rand_int(rng, ranges.height[0], ranges.height[1])
-    w = _rand_int(rng, ranges.width[0], ranges.width[1])
-    d = _rand_int(rng, ranges.depth[0], ranges.depth[1])
+    sampling = sampling or sphere_sampling.SamplingConfig()
 
-    if ranges.min_height is not None:
+    # Dimensions
+    if sampling.fixed_hw:
+        h = int(sampling.fixed_h)
+        w = int(sampling.fixed_w)
+    else:
+        h = _rand_int(rng, ranges.height[0], ranges.height[1])
+        w = _rand_int(rng, ranges.width[0], ranges.width[1])
+
+    if getattr(ranges, "min_height", None) is not None:
         h = max(h, int(ranges.min_height))
-    if ranges.min_width is not None:
+    if getattr(ranges, "min_width", None) is not None:
         w = max(w, int(ranges.min_width))
 
-    pixel_size = float(rng.uniform(ranges.pixel_size[0], ranges.pixel_size[1]))
+    if sampling.fixed_depth is not None:
+        d = int(sampling.fixed_depth)
+    else:
+        d = _rand_int(rng, ranges.depth[0], ranges.depth[1])
+
+    # Pixel size
+    if sampling.fixed_pixel_size is not None:
+        pixel_size = float(sampling.fixed_pixel_size)
+    else:
+        pixel_size = float(rng.uniform(ranges.pixel_size[0], ranges.pixel_size[1]))
+
+    # Radius
     radius = float(rng.uniform(ranges.radius[0], ranges.radius[1]))
 
-    # Center is always inside the cube in voxel coordinates (floats allowed).
-    # Sample uniformly in [0, size-1].
-    cx = float(rng.uniform(0.0, max(0.0, w - 1.0)))
-    cy = float(rng.uniform(0.0, max(0.0, h - 1.0)))
-    cz = float(rng.uniform(0.0, max(0.0, d - 1.0)))
+    # Center
+    if sampling.mode == "mixture":
+        cx, cy, cz = sphere_sampling.sample_center_mixture(
+            rng,
+            H=h,
+            W=w,
+            D=d,
+            pixel_size=pixel_size,
+            radius=radius,
+            z_index=int(ranges.z_index),
+            cfg=sampling.mixture,
+        )
+    elif sampling.mode == "soft":
+        cx, cy, cz = sphere_sampling.sample_center_soft(
+            rng,
+            H=h,
+            W=w,
+            D=d,
+            pixel_size=pixel_size,
+            radius=radius,
+            z_index=int(ranges.z_index),
+            cfg=sampling.soft_dz_mixture,
+        )
+    else:
+        cx, cy, cz = sphere_sampling.sample_center_uniform(rng, h, w, d)
 
     return SphereSliceConfig(
         height=h,
@@ -300,6 +339,7 @@ class OnTheFlySphereSliceDataset(Dataset):
         normalize: bool = True,
         normalize_radius: bool = False,
         add_center_maps: bool = False,
+        sampling: Optional[sphere_sampling.SamplingConfig] = None,
         dtype: torch.dtype = torch.float32,
     ):
         self.ranges = ranges
@@ -322,6 +362,8 @@ class OnTheFlySphereSliceDataset(Dataset):
             self.ranges.min_height = max(self.ranges.min_height or 0, ch)
             self.ranges.min_width = max(self.ranges.min_width or 0, cw)
 
+        self.sampling = sampling or sphere_sampling.SamplingConfig()
+
     def set_epoch(self, epoch: int) -> None:
         self.epoch = int(epoch)
 
@@ -341,7 +383,7 @@ class OnTheFlySphereSliceDataset(Dataset):
 
     def __getitem__(self, idx: int):
         rng = self._make_rng(idx)
-        cfg = sample_config(rng, self.ranges)
+        cfg = sample_config(rng, self.ranges, sampling=self.sampling)
 
         # --- generate full slice + full feature map ---
         top_layer, unet_x, _L = make_slice_and_unet_input(
@@ -391,6 +433,7 @@ class FixedSphereSliceDataset(Dataset):
         normalize: bool = True,
         normalize_radius: bool = False,
         add_center_maps: bool = False,
+        sampling: Optional[sphere_sampling.SamplingConfig] = None,
         dtype: torch.dtype = torch.float32,
     ):
         self.ranges = ranges
@@ -412,10 +455,13 @@ class FixedSphereSliceDataset(Dataset):
             self.ranges.min_height = max(self.ranges.min_height or 0, ch)
             self.ranges.min_width = max(self.ranges.min_width or 0, cw)
 
+        sampling = sampling or sphere_sampling.SamplingConfig()
+
         # Pre-sample configs (lightweight, no big arrays stored)
         rng = np.random.default_rng(self.seed)
         self.configs: List[SphereSliceConfig] = [
-            sample_config(rng, self.ranges) for _ in range(self.num_samples)
+            sample_config(rng, self.ranges, sampling=sampling)
+            for _ in range(self.num_samples)
         ]
 
         # Optional: for fixed crops per sample, pre-sample crop origins too (keeps val fully fixed)

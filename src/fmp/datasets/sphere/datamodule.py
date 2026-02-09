@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
 import lightning.pytorch as pl
 import torch
@@ -8,6 +8,11 @@ from fmp.datasets.sphere.dataset import (
     FixedSphereSliceDataset,
     OnTheFlySphereSliceDataset,
     SphereSliceRanges,
+)
+from fmp.datasets.sphere.sampling import (
+    MixtureSamplerConfig,
+    SamplingConfig,
+    SoftDzSamplerConfig,
 )
 
 __all__ = ["SphereDataModule"]
@@ -20,7 +25,7 @@ class SphereDataModule(pl.LightningDataModule):
         valA_ranges: SphereSliceRanges,
         train_length: int = 20000,
         valA_num: int = 1024,
-        crop_size: Tuple[int, int] = (128, 128),
+        crop_size: Optional[Tuple[int, int]] = (128, 128),
         batch_size: int = 8,
         num_workers: int = 4,
         train_seed: int = 12345,
@@ -29,9 +34,10 @@ class SphereDataModule(pl.LightningDataModule):
         normalize: bool = True,
         normalize_radius: bool = False,
         add_center_maps: bool = False,
+        sampling: Optional[Union[SamplingConfig, dict]] = None,
     ):
         super().__init__()
-        self.save_hyperparameters(ignore=["train_ranges", "valA_ranges"])
+        self.save_hyperparameters(ignore=["train_ranges", "valA_ranges", "sampling"])
         self.train_ranges = train_ranges
         self.valA_ranges = valA_ranges
 
@@ -49,6 +55,7 @@ class SphereDataModule(pl.LightningDataModule):
         self.normalize = normalize
         self.normalize_radius = normalize_radius
         self.add_center_maps = add_center_maps
+        self.sampling = _coerce_sampling(sampling)
 
     def setup(self, stage: Optional[str] = None):
         if stage in (None, "fit"):
@@ -61,6 +68,7 @@ class SphereDataModule(pl.LightningDataModule):
                 normalize=self.normalize,
                 normalize_radius=self.normalize_radius,
                 add_center_maps=self.add_center_maps,
+                sampling=self.sampling,
             )
 
             self.valA_ds = FixedSphereSliceDataset(
@@ -72,6 +80,7 @@ class SphereDataModule(pl.LightningDataModule):
                 normalize=self.normalize,
                 normalize_radius=self.normalize_radius,
                 add_center_maps=self.add_center_maps,
+                sampling=self.sampling,
             )
 
     def train_dataloader(self) -> DataLoader:
@@ -116,11 +125,95 @@ def collate_x_y_cfg(batch: List[Tuple[torch.Tensor, torch.Tensor, Any]]):
     return x, y, list(cfgs)
 
 
+# def _coerce_sampling(sampling) -> "SamplingConfig":
+#     if sampling is None:
+#         return SamplingConfig()
+#     if isinstance(sampling, SamplingConfig):
+#         return sampling
+#     if isinstance(sampling, dict):
+#         return SamplingConfig(**sampling)
+#     raise TypeError(f"Unsupported sampling type: {type(sampling)}")
+
+
+def _coerce_sampling(sampling: Optional[Union[SamplingConfig, dict]]) -> SamplingConfig:
+    if sampling is None:
+        return SamplingConfig()
+    if isinstance(sampling, SamplingConfig):
+        return sampling
+    if isinstance(sampling, dict):
+        d = dict(sampling)
+
+        # mixture dict -> MixtureSamplerConfig
+        if isinstance(d.get("mixture"), dict):
+            d["mixture"] = MixtureSamplerConfig(**d["mixture"])
+
+        # soft dict -> SoftDzSamplerConfig (and keep components as list of tuples)
+        if isinstance(d.get("soft"), dict):
+            soft = dict(d["soft"])
+            # ensure components are tuples
+            comps = soft.get("components", None)
+            if comps is not None:
+                soft["components"] = [tuple(c) for c in comps]
+            d["soft"] = SoftDzSamplerConfig(**soft)
+
+        return SamplingConfig(**d)
+
+    raise TypeError(f"Unsupported sampling type: {type(sampling)}")
+
+
 if __name__ == "__main__":
+    import plotly.express as px
+    from torchvision.utils import make_grid
+
     dm = SphereDataModule(
-        train_ranges=SphereSliceRanges(), valA_ranges=SphereSliceRanges()
+        train_ranges=SphereSliceRanges(
+            height=(100, 100),
+            width=(100, 100),
+            depth=(16, 16),
+            pixel_size=(1.0, 1.0),
+            radius=(1.0, 50.0),
+            z_index=0,
+        ),
+        valA_ranges=SphereSliceRanges(
+            height=(100, 100),
+            width=(100, 100),
+            depth=(16, 16),
+            pixel_size=(1.0, 1.0),
+            radius=(1.0, 50.0),
+            z_index=0,
+        ),
+        crop_size=None,
+        batch_size=32,
+        train_length=100000,
+        valA_num=2048,
+        num_workers=0,
+        normalize=True,
+        normalize_radius=False,
+        add_center_maps=False,
+        sampling={
+            "mode": "mixture",
+            "fixed_hw": True,
+            "fixed_h": 100,
+            "fixed_w": 100,
+            "fixed_depth": 16,
+            "fixed_pixel_size": 1.0,
+            "mixture": {
+                "p_strong": 0.7,
+                "p_faint": 0.2,
+                "p_zero": 0.1,
+                "strong_alpha": 0.4,
+                "faint_beta": 0.8,
+                "zero_gamma": 0.1,
+            },
+        },
     )
     dm.setup("fit")
     batch = next(iter(dm.train_dataloader()))
+
+    images = batch[1]  # (B, 1, H, W)
+    grid = make_grid(images, nrow=8, normalize=False, scale_each=False, pad_value=1.0)
+
+    fig = px.imshow(grid.permute(1, 2, 0).cpu().numpy(), binary_string=True)
+    fig.show()
 
     print("Done")

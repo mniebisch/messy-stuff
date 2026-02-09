@@ -1,3 +1,4 @@
+from . import sampling
 from .datamodule import SphereDataModule
 from .dataset import (
     FixedSphereSliceDataset,
@@ -7,6 +8,7 @@ from .dataset import (
 )
 
 __all__ = [
+    "sampling",
     "SphereDataModule",
     "FixedSphereSliceDataset",
     "OnTheFlySphereSliceDataset",
