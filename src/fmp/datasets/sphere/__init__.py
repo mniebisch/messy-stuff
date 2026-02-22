@@ -1,4 +1,5 @@
 from . import sampling
+from .collate import collate_x_y_meta
 from .datamodule import SphereDataModule
 from .dataset import (
     FixedSphereSliceDataset,
@@ -9,6 +10,7 @@ from .dataset import (
 
 __all__ = [
     "sampling",
+    "collate_x_y_meta",
     "SphereDataModule",
     "FixedSphereSliceDataset",
     "OnTheFlySphereSliceDataset",

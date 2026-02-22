@@ -20,6 +20,96 @@ import torch.nn.functional as F
 __all__ = ["SphereSliceUNetModule"]
 
 
+class FgBgNormalizedHuberWithGrad(nn.Module):
+    """
+    Per-sample normalized loss:
+      - FG loss averaged over FG pixels per sample
+      - BG loss averaged over BG pixels per sample
+      - weighted sum with lambda_fg/lambda_bg
+      - optional gradient matching term (on FG by default)
+
+    This directly fixes "small circles contribute too little gradient".
+    """
+
+    def __init__(
+        self,
+        beta: float = 0.1,
+        lambda_fg: float = 1.0,
+        lambda_bg: float = 0.25,
+        grad_weight: float = 0.1,
+        grad_on_fg_only: bool = True,
+        eps: float = 1e-12,
+    ):
+        super().__init__()
+        self.beta = float(beta)
+        self.lambda_fg = float(lambda_fg)
+        self.lambda_bg = float(lambda_bg)
+        self.grad_weight = float(grad_weight)
+        self.grad_on_fg_only = bool(grad_on_fg_only)
+        self.eps = float(eps)
+
+    @staticmethod
+    def _to_nchw(x: torch.Tensor) -> torch.Tensor:
+        if x.dim() == 3:
+            return x.unsqueeze(1)
+        if x.dim() == 4:
+            return x
+        raise ValueError("Expected (N,H,W) or (N,C,H,W).")
+
+    @staticmethod
+    def _forward_diffs(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        dx = x[..., :, 1:] - x[..., :, :-1]
+        dx = F.pad(dx, (0, 1, 0, 0), mode="replicate")
+        dy = x[..., 1:, :] - x[..., :-1, :]
+        dy = F.pad(dy, (0, 0, 0, 1), mode="replicate")
+        return dx, dy
+
+    def _per_sample_masked_mean(
+        self, loss_map: torch.Tensor, mask: torch.Tensor
+    ) -> torch.Tensor:
+        # loss_map, mask: (N,C,H,W) with mask in {0,1}
+        num = (loss_map * mask).sum(dim=(1, 2, 3))
+        den = mask.sum(dim=(1, 2, 3)).clamp_min(self.eps)
+        return num / den  # (N,)
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        pred = self._to_nchw(pred)
+        target = self._to_nchw(target)
+        if pred.shape != target.shape:
+            raise ValueError(f"pred/target mismatch: {pred.shape} vs {target.shape}")
+
+        # FG/BG masks based on target>0
+        fg = (target > 0.0).to(target.dtype)
+        bg = 1.0 - fg
+
+        pix = F.smooth_l1_loss(
+            pred, target, beta=self.beta, reduction="none"
+        )  # (N,C,H,W)
+        fg_loss = self._per_sample_masked_mean(pix, fg)  # (N,)
+        bg_loss = self._per_sample_masked_mean(pix, bg)  # (N,)
+
+        loss = self.lambda_fg * fg_loss.mean() + self.lambda_bg * bg_loss.mean()
+
+        if self.grad_weight > 0.0:
+            pdx, pdy = self._forward_diffs(pred)
+            tdx, tdy = self._forward_diffs(target)
+            gx = F.smooth_l1_loss(pdx, tdx, beta=self.beta, reduction="none")
+            gy = F.smooth_l1_loss(pdy, tdy, beta=self.beta, reduction="none")
+
+            if self.grad_on_fg_only:
+                # Use fg mask for gradients too
+                g_loss_x = self._per_sample_masked_mean(gx, fg).mean()
+                g_loss_y = self._per_sample_masked_mean(gy, fg).mean()
+            else:
+                # average over all pixels per sample
+                g_loss_x = gx.mean()
+                g_loss_y = gy.mean()
+
+            loss = loss + self.grad_weight * (g_loss_x + g_loss_y)
+
+        return loss
+
+
 class WeightedHuberWithGradLoss(nn.Module):
     """
     Weighted pixel-wise Huber (SmoothL1) + gradient consistency loss.
@@ -229,13 +319,12 @@ class SphereSliceUNetModule(pl.LightningModule):
         decoder_channels: Tuple[int, ...] = (256, 128, 64, 32, 16),
         # output handling:
         output_activation: str = "none",  # "none" | "sigmoid"
-        # loss params:
+        # loss params (new)
         huber_beta: float = 0.1,
         grad_weight: float = 0.1,
-        pos_weight: float = 0.0,
-        use_value_weight: bool = False,
-        value_weight_alpha: float = 0.0,
-        value_weight_gamma: float = 1.0,
+        lambda_fg: float = 1.0,
+        lambda_bg: float = 0.25,
+        grad_on_fg_only: bool = True,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -253,16 +342,16 @@ class SphereSliceUNetModule(pl.LightningModule):
         if self.output_activation not in ("none", "sigmoid"):
             raise ValueError("output_activation must be 'none' or 'sigmoid'.")
 
-        self.criterion = WeightedHuberWithGradLoss(
+        self.criterion = FgBgNormalizedHuberWithGrad(
             beta=huber_beta,
+            lambda_fg=lambda_fg,
+            lambda_bg=lambda_bg,
             grad_weight=grad_weight,
-            weight_mode="any_channel",
-            pos_weight=pos_weight,
-            pos_threshold=0.0,
-            use_value_weight=use_value_weight,
-            value_weight_alpha=value_weight_alpha,
-            value_weight_gamma=value_weight_gamma,
+            grad_on_fg_only=grad_on_fg_only,
         )
+
+        self._val_bucket_sums = None
+        self._val_bucket_counts = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         y_hat = self.model(x)
@@ -270,16 +359,13 @@ class SphereSliceUNetModule(pl.LightningModule):
             y_hat = torch.sigmoid(y_hat)
         return y_hat
 
-    @staticmethod
-    def _unpack_batch(batch: Any) -> Tuple[torch.Tensor, torch.Tensor, Optional[Any]]:
-        if isinstance(batch, (list, tuple)):
-            if len(batch) == 2:
-                x, y = batch
-                return x, y, None
-            if len(batch) == 3:
-                x, y, meta = batch
-                return x, y, meta
-        raise ValueError("Batch must be (x,y) or (x,y,meta/cfg).")
+    def _unpack_batch(self, batch):
+        if isinstance(batch, (tuple, list)) and len(batch) == 3:
+            x, y, meta = batch
+        else:
+            x, y = batch
+            meta = None
+        return x, y, meta
 
     def training_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
         x, y, meta = self._unpack_batch(batch)
@@ -298,34 +384,80 @@ class SphereSliceUNetModule(pl.LightningModule):
 
         return loss
 
-    def validation_step(self, batch: Any, batch_idx: int) -> Dict[str, torch.Tensor]:
+    def validation_step(self, batch, batch_idx):
         x, y, meta = self._unpack_batch(batch)
-        y_hat = self.forward(x)
+        y_hat = self(x)
 
         loss = self.criterion(y_hat, y)
-        l1 = torch.mean(torch.abs(y_hat - y))
-        mse = torch.mean((y_hat - y) ** 2)
-
         self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/l1", l1, on_step=False, on_epoch=True, prog_bar=False)
-        self.log("val/mse", mse, on_step=False, on_epoch=True, prog_bar=False)
 
-        # Optional: log a couple stats from meta if provided as a dict (from collate_x_y_cfg_to_tensors)
-        if isinstance(meta, dict) and "radius" in meta and batch_idx == 0:
-            self.log(
-                "val/radius_mean",
-                meta["radius"].float().mean(),
-                on_step=False,
-                on_epoch=True,
-                prog_bar=False,
+        mae_all, mae_fg, mae_bg, fg_frac = self._mae_maps(y_hat, y)
+        self.log("val/mae_all", mae_all, on_step=False, on_epoch=True)
+        self.log("val/mae_fg", mae_fg, on_step=False, on_epoch=True)
+        self.log("val/mae_bg", mae_bg, on_step=False, on_epoch=True)
+        self.log("val/fg_frac", fg_frac, on_step=False, on_epoch=True)
+
+        # bucketed fg MAE (needs meta)
+        if meta is not None and "radius_bucket" in meta:
+            b = meta["radius_bucket"].to(self.device).long()  # (B,)
+
+            # lazily allocate/resize buffers to fit observed bucket ids
+            self._ensure_bucket_buffers(int(b.max().item()))
+
+            abs_err = (y_hat - y).abs()  # (B,1,H,W)
+            fg = (y > 0).float()
+
+            # per-sample fg MAE
+            per_num = (abs_err * fg).sum(dim=(1, 2, 3))
+            per_den = fg.sum(dim=(1, 2, 3)).clamp_min(1.0)
+            per_mae_fg = per_num / per_den  # (B,)
+
+            # accumulate sums and counts per bucket
+            self._val_bucket_sums.index_add_(0, b, per_mae_fg)
+            self._val_bucket_counts.index_add_(0, b, torch.ones_like(per_mae_fg))
+
+        return loss
+
+    def on_validation_epoch_start(self):
+        self._val_bucket_sums = None
+        self._val_bucket_counts = None
+
+    def on_validation_epoch_end(self):
+        if self._val_bucket_sums is None:
+            return
+        nb = self._val_bucket_sums.numel()
+        worst = None
+        for bi in range(nb):
+            denom = self._val_bucket_counts[bi].clamp_min(1.0)
+            mae_fg_b = self._val_bucket_sums[bi] / denom
+            self.log(f"val/mae_fg_bucket_{bi}", mae_fg_b, on_step=False, on_epoch=True)
+            worst = mae_fg_b if worst is None else torch.maximum(worst, mae_fg_b)
+        if worst is not None:
+            self.log("val/mae_fg_bucket_worst", worst, on_step=False, on_epoch=True)
+
+    def _mae_maps(self, pred: torch.Tensor, target: torch.Tensor):
+        # pred/target: (B,1,H,W)
+        abs_err = (pred - target).abs()
+        fg = (target > 0).float()
+        bg = 1.0 - fg
+        fg_frac = fg.mean()
+
+        mae_all = abs_err.mean()
+        mae_fg = (abs_err * fg).sum() / fg.sum().clamp_min(1.0)
+        mae_bg = (abs_err * bg).sum() / bg.sum().clamp_min(1.0)
+        return mae_all, mae_fg, mae_bg, fg_frac
+
+    def _ensure_bucket_buffers(self, max_bucket_idx: int):
+        needed = int(max_bucket_idx) + 1
+        if self._val_bucket_sums is None:
+            self._val_bucket_sums = torch.zeros(needed, device=self.device)
+            self._val_bucket_counts = torch.zeros(needed, device=self.device)
+            return
+        if needed > self._val_bucket_sums.numel():
+            pad = needed - self._val_bucket_sums.numel()
+            self._val_bucket_sums = torch.cat(
+                [self._val_bucket_sums, torch.zeros(pad, device=self.device)]
             )
-            if "pixel_size" in meta:
-                self.log(
-                    "val/pixel_size_mean",
-                    meta["pixel_size"].float().mean(),
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=False,
-                )
-
-        return {"val_loss": loss}
+            self._val_bucket_counts = torch.cat(
+                [self._val_bucket_counts, torch.zeros(pad, device=self.device)]
+            )

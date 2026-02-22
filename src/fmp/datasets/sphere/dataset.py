@@ -247,74 +247,84 @@ def _rand_int(rng: np.random.Generator, lo: int, hi: int) -> int:
 
 
 def sample_config(
-    rng: np.random.Generator,
-    ranges: SphereSliceRanges,
-    sampling: Optional[sphere_sampling.SamplingConfig] = None,
-) -> SphereSliceConfig:
-    sampling = sampling or sphere_sampling.SamplingConfig()
+    rng: np.random.Generator, ranges, sampling: sphere_sampling.SamplingConfig
+) -> tuple["SphereSliceConfig", dict]:
+    # dimensions
+    H = (
+        sampling.fixed_h
+        if sampling.fixed_hw
+        else int(rng.integers(ranges.height[0], ranges.height[1] + 1))
+    )
+    W = (
+        sampling.fixed_w
+        if sampling.fixed_hw
+        else int(rng.integers(ranges.width[0], ranges.width[1] + 1))
+    )
+    D = (
+        sampling.fixed_depth
+        if sampling.fixed_depth is not None
+        else int(rng.integers(ranges.depth[0], ranges.depth[1] + 1))
+    )
+    pixel_size = (
+        sampling.fixed_pixel_size
+        if sampling.fixed_pixel_size is not None
+        else float(rng.uniform(ranges.pixel_size[0], ranges.pixel_size[1]))
+    )
 
-    # Dimensions
-    if sampling.fixed_hw:
-        h = int(sampling.fixed_h)
-        w = int(sampling.fixed_w)
+    # radius stratification
+    if sampling.use_radius_buckets:
+        radius, r_bucket = sphere_sampling.sample_radius_bucketed(
+            rng, sampling.radius_buckets
+        )
     else:
-        h = _rand_int(rng, ranges.height[0], ranges.height[1])
-        w = _rand_int(rng, ranges.width[0], ranges.width[1])
+        radius = float(rng.uniform(ranges.radius[0], ranges.radius[1]))
+        r_bucket = -1
 
-    if getattr(ranges, "min_height", None) is not None:
-        h = max(h, int(ranges.min_height))
-    if getattr(ranges, "min_width", None) is not None:
-        w = max(w, int(ranges.min_width))
-
-    if sampling.fixed_depth is not None:
-        d = int(sampling.fixed_depth)
-    else:
-        d = _rand_int(rng, ranges.depth[0], ranges.depth[1])
-
-    # Pixel size
-    if sampling.fixed_pixel_size is not None:
-        pixel_size = float(sampling.fixed_pixel_size)
-    else:
-        pixel_size = float(rng.uniform(ranges.pixel_size[0], ranges.pixel_size[1]))
-
-    # Radius
-    radius = float(rng.uniform(ranges.radius[0], ranges.radius[1]))
-
-    # Center
+    # center
     if sampling.mode == "mixture":
-        cx, cy, cz = sphere_sampling.sample_center_mixture(
+        center_xyz, mode = sphere_sampling.sample_center_mixture(
             rng,
-            H=h,
-            W=w,
-            D=d,
-            pixel_size=pixel_size,
-            radius=radius,
+            H=H,
+            W=W,
+            D=D,
+            pixel_size=float(pixel_size),
+            radius=float(radius),
             z_index=int(ranges.z_index),
             cfg=sampling.mixture,
         )
-    elif sampling.mode == "soft":
-        cx, cy, cz = sphere_sampling.sample_center_soft(
-            rng,
-            H=h,
-            W=w,
-            D=d,
-            pixel_size=pixel_size,
-            radius=radius,
-            z_index=int(ranges.z_index),
-            cfg=sampling.soft_dz_mixture,
-        )
     else:
-        cx, cy, cz = sphere_sampling.sample_center_uniform(rng, h, w, d)
+        center_xyz = sphere_sampling.sample_center_uniform(rng, H, W, D)
+        mode = "uniform"
 
-    return SphereSliceConfig(
-        height=h,
-        width=w,
-        depth=d,
-        pixel_size=pixel_size,
-        center_xyz=(cx, cy, cz),
-        radius=radius,
+    cfg = SphereSliceConfig(
+        height=int(H),
+        width=int(W),
+        depth=int(D),
+        pixel_size=float(pixel_size),
+        center_xyz=center_xyz,
+        radius=float(radius),
         z_index=int(ranges.z_index),
     )
+
+    # meta for logging/analysis (no rendering required)
+    cz = float(center_xyz[2])
+    dz_vox = abs(cz - float(cfg.z_index))
+    dz_phys = dz_vox * float(cfg.pixel_size)
+    u = dz_phys / float(cfg.radius) if cfg.radius > 0 else 0.0
+    r_slice = np.sqrt(max(cfg.radius**2 - dz_phys**2, 0.0))
+    max_value = max(1.0 - u, 0.0)
+
+    meta = {
+        "radius_bucket": int(r_bucket),
+        "mode": mode,
+        "radius": float(cfg.radius),
+        "cz": float(cz),
+        "dz_phys": float(dz_phys),
+        "u": float(u),
+        "r_slice_phys": float(r_slice),
+        "max_value": float(max_value),
+    }
+    return cfg, meta
 
 
 # -------------------------
@@ -383,7 +393,7 @@ class OnTheFlySphereSliceDataset(Dataset):
 
     def __getitem__(self, idx: int):
         rng = self._make_rng(idx)
-        cfg = sample_config(rng, self.ranges, sampling=self.sampling)
+        cfg, meta = sample_config(rng, self.ranges, sampling=self.sampling)
 
         # --- generate full slice + full feature map ---
         top_layer, unet_x, _L = make_slice_and_unet_input(
@@ -415,7 +425,14 @@ class OnTheFlySphereSliceDataset(Dataset):
         x = torch.from_numpy(unet_x).to(self.dtype)  # (C,H,W)
         y = torch.from_numpy(top_layer).to(self.dtype).unsqueeze(0)  # (1,H,W)
 
-        return x, y  # , cfg  # cfg is handy for debugging; you can drop it if you want
+        meta_t = {
+            "radius_bucket": torch.tensor(meta["radius_bucket"], dtype=torch.long),
+            "radius": torch.tensor(meta["radius"], dtype=torch.float32),
+            "u": torch.tensor(meta["u"], dtype=torch.float32),
+            "mode": meta["mode"],  # string is OK, kept as python object
+        }
+
+        return x, y, meta_t
 
 
 class FixedSphereSliceDataset(Dataset):
@@ -449,6 +466,9 @@ class FixedSphereSliceDataset(Dataset):
         )
         self.dtype = dtype
 
+        self.configs: List[SphereSliceConfig] = []
+        self.metas: List[dict] = []
+
         # Ensure sampled scenes are at least crop size
         if self.crop_size is not None:
             ch, cw = self.crop_size
@@ -459,10 +479,10 @@ class FixedSphereSliceDataset(Dataset):
 
         # Pre-sample configs (lightweight, no big arrays stored)
         rng = np.random.default_rng(self.seed)
-        self.configs: List[SphereSliceConfig] = [
-            sample_config(rng, self.ranges, sampling=sampling)
-            for _ in range(self.num_samples)
-        ]
+        for _ in range(self.num_samples):
+            cfg, meta = sample_config(rng, self.ranges, sampling=sampling)
+            self.configs.append(cfg)
+            self.metas.append(meta)
 
         # Optional: for fixed crops per sample, pre-sample crop origins too (keeps val fully fixed)
         self.crop_origins: Optional[List[Tuple[int, int]]] = None
@@ -482,6 +502,7 @@ class FixedSphereSliceDataset(Dataset):
 
     def __getitem__(self, idx: int):
         cfg = self.configs[idx]
+        meta = self.metas[idx]
 
         top_layer, unet_x, _L = make_slice_and_unet_input(
             height=cfg.height,
@@ -503,4 +524,11 @@ class FixedSphereSliceDataset(Dataset):
         x = torch.from_numpy(unet_x).to(self.dtype)
         y = torch.from_numpy(top_layer).to(self.dtype).unsqueeze(0)
 
-        return x, y  # , cfg
+        meta_t = {
+            "radius_bucket": torch.tensor(meta["radius_bucket"], dtype=torch.long),
+            "radius": torch.tensor(meta["radius"], dtype=torch.float32),
+            "u": torch.tensor(meta["u"], dtype=torch.float32),
+            "mode": meta["mode"],  # keep as string
+        }
+
+        return x, y, meta_t

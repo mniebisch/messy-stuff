@@ -4,6 +4,7 @@ import lightning.pytorch as pl
 import torch
 from torch.utils.data import DataLoader
 
+from fmp.datasets.sphere.collate import collate_x_y_meta
 from fmp.datasets.sphere.dataset import (
     FixedSphereSliceDataset,
     OnTheFlySphereSliceDataset,
@@ -13,6 +14,7 @@ from fmp.datasets.sphere.sampling import (
     MixtureSamplerConfig,
     SamplingConfig,
     SoftDzSamplerConfig,
+    coerce_sampling,
 )
 
 __all__ = ["SphereDataModule"]
@@ -55,7 +57,7 @@ class SphereDataModule(pl.LightningDataModule):
         self.normalize = normalize
         self.normalize_radius = normalize_radius
         self.add_center_maps = add_center_maps
-        self.sampling = _coerce_sampling(sampling)
+        self.sampling = coerce_sampling(sampling)
 
     def setup(self, stage: Optional[str] = None):
         if stage in (None, "fit"):
@@ -91,7 +93,7 @@ class SphereDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
             drop_last=True,
-            # collate_fn=collate_x_y_cfg,
+            collate_fn=collate_x_y_meta,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -102,63 +104,13 @@ class SphereDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
-            # collate_fn=collate_x_y_cfg,
+            collate_fn=collate_x_y_meta,
         )
 
     def on_train_epoch_start(self):
         # Ensure on-the-fly dataset changes across epochs deterministically
         if self.train_ds is not None:
             self.train_ds.set_epoch(int(self.trainer.current_epoch))
-
-
-def collate_x_y_cfg(batch: List[Tuple[torch.Tensor, torch.Tensor, Any]]):
-    """
-    Batch entries are (x, y, cfg).
-    Returns:
-      x: (B, C, H, W)
-      y: (B, 1, H, W)
-      cfgs: list of cfg objects length B
-    """
-    xs, ys, cfgs = zip(*batch)
-    x = torch.stack(xs, dim=0)
-    y = torch.stack(ys, dim=0)
-    return x, y, list(cfgs)
-
-
-# def _coerce_sampling(sampling) -> "SamplingConfig":
-#     if sampling is None:
-#         return SamplingConfig()
-#     if isinstance(sampling, SamplingConfig):
-#         return sampling
-#     if isinstance(sampling, dict):
-#         return SamplingConfig(**sampling)
-#     raise TypeError(f"Unsupported sampling type: {type(sampling)}")
-
-
-def _coerce_sampling(sampling: Optional[Union[SamplingConfig, dict]]) -> SamplingConfig:
-    if sampling is None:
-        return SamplingConfig()
-    if isinstance(sampling, SamplingConfig):
-        return sampling
-    if isinstance(sampling, dict):
-        d = dict(sampling)
-
-        # mixture dict -> MixtureSamplerConfig
-        if isinstance(d.get("mixture"), dict):
-            d["mixture"] = MixtureSamplerConfig(**d["mixture"])
-
-        # soft dict -> SoftDzSamplerConfig (and keep components as list of tuples)
-        if isinstance(d.get("soft"), dict):
-            soft = dict(d["soft"])
-            # ensure components are tuples
-            comps = soft.get("components", None)
-            if comps is not None:
-                soft["components"] = [tuple(c) for c in comps]
-            d["soft"] = SoftDzSamplerConfig(**soft)
-
-        return SamplingConfig(**d)
-
-    raise TypeError(f"Unsupported sampling type: {type(sampling)}")
 
 
 if __name__ == "__main__":

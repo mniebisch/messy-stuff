@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -9,20 +9,53 @@ __all__ = [
     "MixtureSamplerConfig",
     "SamplingConfig",
     "SoftDzSamplerConfig",
-    "sample_center_uniform",
+    "RadiusBucketConfig",
+    "coerce_sampling",
     "sample_center_mixture",
+    "sample_radius_bucketed",
+    "sample_center_uniform",
 ]
 
 
 @dataclass
-class MixtureSamplerConfig:
-    # probabilities
-    p_strong: float = 0.7
-    p_medium: float = 0.20
-    p_faint: float = 0.2
-    p_zero: float = 0.1
+class RadiusBucketConfig:
+    """
+    Buckets are inclusive ranges in physical units.
+    Example:
+      buckets = [(1,6), (6,15), (15,30), (30,50)]
+      probs   = [0.4, 0.3, 0.2, 0.1]
+    """
 
-    # regime parameters
+    buckets: List[Tuple[float, float]] = field(
+        default_factory=lambda: [(1.0, 6.0), (6.0, 15.0), (15.0, 30.0), (30.0, 50.0)]
+    )
+    probs: List[float] = field(default_factory=lambda: [0.4, 0.3, 0.2, 0.1])
+
+    def normalize_probs(self) -> np.ndarray:
+        p = np.array(self.probs, dtype=np.float64)
+        p = p / p.sum()
+        return p
+
+
+def sample_radius_bucketed(
+    rng: np.random.Generator, cfg: RadiusBucketConfig
+) -> tuple[float, int]:
+    p = cfg.normalize_probs()
+    b = int(rng.choice(len(cfg.buckets), p=p))
+    lo, hi = cfg.buckets[b]
+    r = float(rng.uniform(lo, hi))
+    return r, b
+
+
+@dataclass
+class MixtureSamplerConfig:
+    # probabilities (must sum to 1 after normalization)
+    p_strong: float = 0.55
+    p_medium: float = 0.20
+    p_faint: float = 0.15
+    p_zero: float = 0.10
+
+    # u = dz/r bands in voxel units (dz_vox relative to r_vox)
     strong_alpha: float = 0.4  # strong: dz <= alpha*r
     medium_lo: float = 0.4  # medium: dz in [medium_lo*r, medium_hi*r]
     medium_hi: float = 0.8
@@ -64,9 +97,14 @@ class SamplingConfig:
       - "soft": sample dz/r from a mixture of uniform intervals, plus an optional zero component
     """
 
+    # radius sampling
+    use_radius_buckets: bool = True
+    radius_buckets: RadiusBucketConfig = field(default_factory=RadiusBucketConfig)
+
+    # center sampling in z
     mode: str = "uniform"  # "uniform" | "mixture" | "soft"
     mixture: MixtureSamplerConfig = field(default_factory=MixtureSamplerConfig)
-    soft_dz_mixture: SoftDzSamplerConfig = field(default_factory=SoftDzSamplerConfig)
+    # soft_dz_mixture: SoftDzSamplerConfig = field(default_factory=SoftDzSamplerConfig)
 
     # optional stabilization knobs
     fixed_hw: bool = False
@@ -74,6 +112,32 @@ class SamplingConfig:
     fixed_w: int = 100
     fixed_depth: Optional[int] = None  # e.g. 8
     fixed_pixel_size: Optional[float] = None  # e.g. 1.0
+
+
+def coerce_sampling(sampling: Any) -> SamplingConfig:
+    """Allows YAML/dict input with nested dicts."""
+    if sampling is None:
+        return SamplingConfig()
+
+    if isinstance(sampling, SamplingConfig):
+        return sampling
+
+    if isinstance(sampling, dict):
+        d = dict(sampling)
+
+        # radius buckets
+        rb = d.get("radius_buckets", None)
+        if isinstance(rb, dict):
+            d["radius_buckets"] = RadiusBucketConfig(**rb)
+
+        # mixture
+        mix = d.get("mixture", None)
+        if isinstance(mix, dict):
+            d["mixture"] = MixtureSamplerConfig(**mix)
+
+        return SamplingConfig(**d)
+
+    raise TypeError(f"Unsupported sampling type: {type(sampling)}")
 
 
 def _clip(
@@ -98,7 +162,7 @@ def _sample_from_intervals(
 
 def sample_center_uniform(
     rng: np.random.Generator, H: int, W: int, D: int
-) -> Tuple[float, float, float]:
+) -> tuple[float, float, float]:
     cx = float(rng.uniform(0.0, max(0.0, W - 1.0)))
     cy = float(rng.uniform(0.0, max(0.0, H - 1.0)))
     cz = float(rng.uniform(0.0, max(0.0, D - 1.0)))
@@ -137,28 +201,29 @@ def sample_center_mixture(
     radius: float,
     z_index: int,
     cfg: MixtureSamplerConfig,
-) -> Tuple[float, float, float]:
+) -> tuple[tuple[float, float, float], str]:
     cx, cy, _ = sample_center_uniform(rng, H, W, D)
+
+    p = np.array(
+        [cfg.p_strong, cfg.p_medium, cfg.p_faint, cfg.p_zero], dtype=np.float64
+    )
+    p = p / p.sum()
+    chosen = str(rng.choice(["strong", "medium", "faint", "zero"], p=p))
 
     z0 = float(z_index)
     cz_min, cz_max = 0.0, float(D - 1)
     r_vox = radius / float(pixel_size)
 
-    probs = np.array(
-        [cfg.p_strong, cfg.p_medium, cfg.p_faint, cfg.p_zero], dtype=np.float64
-    )
-    probs = probs / probs.sum()
-    mode = str(rng.choice(["strong", "medium", "faint", "zero"], p=probs))
-
-    def try_mode(m: str) -> Optional[float]:
-        if m == "strong":
+    def try_mode(mode: str) -> Optional[float]:
+        if mode == "strong":
             dz_max = cfg.strong_alpha * r_vox
             interval = _clip(z0 - dz_max, z0 + dz_max, cz_min, cz_max)
             if interval is None:
                 return None
-            return float(rng.uniform(interval[0], interval[1]))
+            lo, hi = interval
+            return float(rng.uniform(lo, hi))
 
-        if m == "medium":
+        if mode == "medium":
             dz_lo = cfg.medium_lo * r_vox
             dz_hi = cfg.medium_hi * r_vox
             if dz_lo > dz_hi:
@@ -170,7 +235,7 @@ def sample_center_mixture(
                 return None
             return _sample_from_intervals(rng, intervals)
 
-        if m == "faint":
+        if mode == "faint":
             dz_lo = cfg.faint_beta * r_vox
             dz_hi = (1.0 - cfg.eps) * r_vox
             if dz_lo > dz_hi:
@@ -182,7 +247,7 @@ def sample_center_mixture(
                 return None
             return _sample_from_intervals(rng, intervals)
 
-        if m == "zero":
+        if mode == "zero":
             dz_min = (1.0 + cfg.zero_gamma) * r_vox
             left = _clip(cz_min, z0 - dz_min, cz_min, cz_max)
             right = _clip(z0 + dz_min, cz_max, cz_min, cz_max)
@@ -191,17 +256,16 @@ def sample_center_mixture(
                 return None
             return _sample_from_intervals(rng, intervals)
 
-        raise ValueError(m)
+        raise ValueError(mode)
 
-    # chosen mode, then fallbacks
-    for m in [mode, "strong", "medium", "faint", "zero"]:
-        cz = try_mode(m)
+    for mode in [chosen, "strong", "medium", "faint", "zero"]:
+        cz = try_mode(mode)
         if cz is not None:
-            return cx, cy, cz
+            return (cx, cy, cz), mode
 
-    # fallback to uniform
-    _, _, cz = sample_center_uniform(rng, H, W, D)
-    return cx, cy, cz
+    # fallback
+    cx, cy, cz = sample_center_uniform(rng, H, W, D)
+    return (cx, cy, cz), "uniform_fallback"
 
 
 def sample_center_soft(
