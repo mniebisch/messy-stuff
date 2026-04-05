@@ -1,8 +1,8 @@
 {
     "build": {
         "context": "..",
-        "dockerfile": "../Dockerfile_huggingface"
-        // "target": "devcontainer"
+        "dockerfile": "../Dockerfile",
+        "target": "devcontainer"
     },
     "customizations": {
         "vscode": {
@@ -33,16 +33,15 @@
             "onAutoForward": "openBrowser" // optional: open browser automatically
         }
     },
-    "postCreateCommand": "pip install -e . --no-deps",
-    "remoteUser": "diffuser",
+    "remoteUser": "devuser",
     "mounts": [
-        "source=${localEnv:HOME}/.cache/huggingface/hub,target=/mnt/huggingface/hub,type=bind",
+        // "source=${localEnv:HOME}/.cache/huggingface/hub,target=/mnt/huggingface/hub,type=bind",
         "source=${localEnv:HOME}/data,target=/mnt/data,type=bind"
     ],
-    "containerEnv": {
-        "HF_HUB_CACHE": "/mnt/huggingface/hub"
-    },
-    "remoteEnv": {
-        "HF_HUB_CACHE": "/mnt/huggingface/hub"
-    }
+    // "containerEnv": {
+    //     "HF_HUB_CACHE": "/mnt/huggingface/hub"
+    // },
+    // "remoteEnv": {
+    //     "HF_HUB_CACHE": "/mnt/huggingface/hub"
+    // }
 }
