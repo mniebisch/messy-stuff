@@ -10,7 +10,8 @@
                 "ms-python.python",
                 "ms-python.isort",
                 "ms-python.black-formatter",
-                "ms-python.mypy-type-checker"
+                "ms-python.mypy-type-checker",
+                "anthropic.claude-code" // Added
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/opt/conda/bin/python"
@@ -30,13 +31,14 @@
     "portsAttributes": {
         "8050": {
             "label": "Dash",
-            "onAutoForward": "openBrowser" // optional: open browser automatically
+            "onAutoForward": "openBrowser"
         }
     },
     "remoteUser": "devuser",
     "mounts": [
-        // "source=${localEnv:HOME}/.cache/huggingface/hub,target=/mnt/huggingface/hub,type=bind",
-        "source=${localEnv:HOME}/data,target=/mnt/data,type=bind"
+        "source=${localEnv:HOME}/data,target=/mnt/data,type=bind",
+        "source=${localEnv:HOME}/.claude,target=/home/devuser/.claude,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.claude.json,target=/home/devuser/.claude.json,type=bind,consistency=cached" // Added: auth token lives here
     ],
     // "containerEnv": {
     //     "HF_HUB_CACHE": "/mnt/huggingface/hub"
