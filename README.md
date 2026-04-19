@@ -30,6 +30,46 @@ python scripts/compute_fingerspelling5_metrics.py predict \
     --config configs/metric_computation.yaml
 ```
 
+## SWA Continuation (Stochastic Weight Averaging)
+
+Load weights from a trained checkpoint and run a short SWA continuation with a fresh optimizer.
+Uses `WeightAveraging` (step-wise averaging) + `SWALR` (anneals LR to a fixed SWA target).
+
+```bash
+python scripts/train_mlflow_swa.py fit \
+    --config configs/fingerspelling5_singlehands/train_with_mlflow_swa.yaml \
+    --model_init_ckpt checkpoints/<experiment>/<run_id>/<checkpoint>.ckpt
+```
+
+**Do not use `--ckpt_path`** — that restores full training state (optimizer, scheduler).
+`--model_init_ckpt` loads only the model weights, leaving the optimizer fresh.
+
+### Sweeping the SWA learning rate
+
+Override `swa_lr` per run directly on the CLI (keep the tag in sync for MLFlow filtering):
+
+```bash
+python scripts/train_mlflow_swa.py fit \
+    --config configs/fingerspelling5_singlehands/train_with_mlflow_swa.yaml \
+    --model_init_ckpt checkpoints/<experiment>/<run_id>/<checkpoint>.ckpt \
+    --lr_scheduler.init_args.swa_lr=1e-5 \
+    --trainer.logger.init_args.tags.swa_lr="1e-5"
+```
+
+Suggested sweep: `1e-5` (conservative) / `5e-5` (middle) / `2e-4` (aggressive).
+Pick the range by looking at the original run's `LearningRateMonitor` log at the epoch where
+validation was near its best but still visibly improving.
+
+### Evaluation after an SWA run
+
+Compare three models using the standard layered-config predict/test workflow:
+
+| Model | How to get it |
+|---|---|
+| Base checkpoint | Original training run checkpoint |
+| Averaged model | Load SWA checkpoint normally (`state_dict` holds averaged weights) |
+| Non-averaged model | Extract `averaging_state.current_model_state_dict` from the SWA checkpoint |
+
 ## Synthetic Data (Or how to process a dataset)
 
 ### Sequence of Manual Steps
@@ -136,4 +176,38 @@ python pipelies/fingerspelling5/train_eval.py \
 
 source .venv/bin/activate && python scripts/train_mlflow_basic.py fit --config configs/fingerspelling5_singlehands/train_with_mlflow.yaml 
 
-mlflow ui --backend-store-uri sqlite:///mlruns.db --default-artifact-root ./artifacts
+# MLFlow UI - use the same artifact root as configured in your YAML
+mlflow ui --backend-store-uri sqlite:///mlruns.db --default-artifact-root ./mlruns
+
+## Downloading MLflow Artifacts
+
+Artifacts logged to the tracking server live in a Docker volume, not on the local filesystem.
+Use the MLflow CLI to download them:
+
+```bash
+# Download a specific checkpoint
+mlflow artifacts download -r <run_id> -a checkpoints/<checkpoint>.ckpt -d ./checkpoints
+
+# Download all artifacts for a run
+mlflow artifacts download -r <run_id> -d ./artifacts
+```
+
+python scripts/train_mlflow_basic.py fit --config configs/fingerspelling5_singlehands/train_with_mlflow_mixed.yaml 
+
+# current to fix installs
+pip install -U 'jsonargparse[signatures]>=4.27.7'
+pip install aim
+pip install lmdb
+
+# files for mlflow stuff
+scripts/train_mlflow_basic.py
+/workspaces/webcam_feed/src/fmp/lit_tools/callbacks/mlflow/mlflow_config_callback.py
+/workspaces/webcam_feed/src/fmp/lit_tools/callbacks/mlflow/mlflow_modelcheckpoint.py
+
+/workspaces/webcam_feed/configs/fingerspelling5_singlehands/train_with_mlflow_mixed.yaml
+
+
+python scripts/train_mlflow_swa.py fit --config /mnt/mlflow-archive/2026-04-11-pre-server/mlruns/9/c0b2e0ebd99243cc80e2d44c83a8c602/artifacts/configs/config_updated.yaml --config configs/fingerspelling5_singlehands/train_with_mlflow_swa.yaml --model_init_ckpt /mnt/mlflow-archive/2026-04-11-pre-server/mlruns/9/c0b2e0ebd99243cc80e2d44c83a8c602/artifacts/checkpoints/epoch\=18-step\=15998.ckpt
+
+
+python scripts/train_mlflow_swa.py fit --config configs/fingerspelling5_singlehands/train_with_mlflow_swa.yaml --model_init_ckpt /mnt/mlflow-archive/2026-04-11-pre-server/mlruns/9/c0b2e0ebd99243cc80e2d44c83a8c602/artifacts/checkpoints/epoch\=18-step\=15998.ckpt

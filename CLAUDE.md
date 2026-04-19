@@ -31,6 +31,21 @@ python scripts/train_mlflow_basic.py fit --config configs/fingerspelling5_single
 python scripts/train_mlflow_basic.py fit --config configs/fingerspelling5_singlehands/train_with_mlflow.yaml
 ```
 
+### SWA Continuation
+```bash
+# Load weights from existing checkpoint, start fresh optimizer, run SWA phase
+python scripts/train_mlflow_swa.py fit \
+  --config configs/fingerspelling5_singlehands/train_with_mlflow_swa.yaml \
+  --model_init_ckpt checkpoints/<experiment>/<run_id>/<checkpoint>.ckpt
+
+# Sweep swa_lr via CLI override (keep tag in sync for MLFlow filtering)
+python scripts/train_mlflow_swa.py fit \
+  --config configs/fingerspelling5_singlehands/train_with_mlflow_swa.yaml \
+  --model_init_ckpt checkpoints/<experiment>/<run_id>/<checkpoint>.ckpt \
+  --lr_scheduler.init_args.swa_lr=1e-5 \
+  --trainer.logger.init_args.tags.swa_lr="1e-5"
+```
+
 ### Prediction & Testing
 ```bash
 python scripts/train_mlflow_basic.py predict \
@@ -47,9 +62,23 @@ python scripts/optuna_hpo.py
 ```
 
 ### MLFlow UI
+
+Experiment tracking is handled by the dedicated `mlflow-infra` server (a
+Docker container on this machine — see `~/projects/mlflow-infra/`). The UI
+is always up at **http://localhost:5000**; no command needed to launch it.
+Verify the server is running:
 ```bash
-mlflow ui --backend-store-uri sqlite:///mlruns.db --default-artifact-root ./mlruns
-# Available at http://localhost:5000
+docker ps --filter name=mlflow-server
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5000   # expect 200
+```
+
+To browse the pre-migration archive (runs from before 2026-04-11, most with
+broken artifact links — only the SWA base run has on-disk artifacts):
+```bash
+mlflow ui \
+  --backend-store-uri sqlite:////home/micha/mlflow-archive/2026-04-11-pre-server/mlruns.db \
+  --default-artifact-root file:///home/micha/mlflow-archive/2026-04-11-pre-server/mlruns \
+  --port 5050
 ```
 
 ### Tests
@@ -91,6 +120,7 @@ src/fmp/                    # Main package
 
 scripts/                    # Entry points
   train_mlflow_basic.py     # MAIN entry point
+  train_mlflow_swa.py       # SWA continuation entry point (SWALightningCLI + --model_init_ckpt)
   train_fingerspelling5_litcli.py
   optuna_hpo.py
   create_fingerspelling5_*.py
@@ -104,8 +134,8 @@ configs/
 tests/fmp/datasets/fingerspelling5/metrics/  # Unit tests
 
 data/                       # Datasets (mounted from ~/data in devcontainer)
-mlruns/                     # MLFlow artifacts
-checkpoints/                # Saved model checkpoints
+checkpoints/                # Saved model checkpoints (local — MLflow artifacts live in the mlflow-infra server's Docker volume)
+config_logs/                # MLFlowConfigCallback local config cache, keyed by run_id (used for test/predict layering)
 lightning_logs/             # PyTorch Lightning logs
 ```
 
@@ -170,6 +200,16 @@ model:
 
 This means the YAML file is a complete, reproducible description of a run. LightningCLI resolves and instantiates all components before passing them to the `Trainer`.
 
+### SWALightningCLI (`train_mlflow_swa.py`)
+
+`SWALightningCLI` is a `LightningCLI` subclass used exclusively for SWA continuation runs. It adds one extra argument:
+
+- `--model_init_ckpt <path>` — loads `state_dict` from a checkpoint into the already-instantiated model in `before_fit`, **without** restoring optimizer or scheduler state.
+
+This is different from `--ckpt_path`, which resumes full training state (optimizer moments, scheduler step, epoch counter). Use `--model_init_ckpt` when you want "old weights, fresh optimizer trajectory" for the SWA phase.
+
+`ResNetClassifier` uses `save_hyperparameters(ignore=["model"])`, so `load_from_checkpoint` cannot reconstruct the model. The `before_fit` state-dict approach is correct: LightningCLI instantiates the model from the YAML config first, then weights are overwritten before training starts.
+
 ### MLFlowConfigCallback
 
 `MLFlowConfigCallback` (extends `SaveConfigCallback`) runs at the start of `fit`/`test` and:
@@ -192,6 +232,85 @@ The mixed config uses `fmp.lr_schedulers.cosine_annealing_warmup` (with `warmup_
 | `MLFlowModelCheckpoint` | Top-K checkpoint saving; logs best checkpoints as MLFlow artifacts |
 | `MLFlowImageLogger` | Logs training image batches as artifacts (for augmentation debugging) |
 | `MLFlowSystemMetricsLogger` | System/GPU metrics logging |
+
+## MLflow Tracking Server
+
+Since 2026-04-11 this project logs to a dedicated MLflow tracking server
+(`mlflow-infra`) running as a Docker container on the host. The server lives
+at `~/projects/mlflow-infra/` — a sibling project-agnostic directory that
+can be reused by any other project on this machine. See
+`~/projects/mlflow-infra/README.md` for the full ops manual and
+`~/projects/mlflow-infra/CLAUDE.md` for a quick reference.
+
+### Client wiring
+
+`MLFLOW_TRACKING_URI` is exported in `~/.bashrc` and `~/.profile`, so
+host-side training just works:
+```bash
+export MLFLOW_TRACKING_URI=http://localhost:5000                  # host
+export MLFLOW_TRACKING_URI=http://mlflow-server:5000              # inside a container on mlflow-net
+```
+
+Training configs (`train_with_mlflow_mixed.yaml`,
+`train_with_mlflow_swa.yaml`, `test_with_mlflow.yaml`) intentionally **omit
+both `tracking_uri` and `artifact_location`** from the logger init args —
+the env var drives tracking and the server owns artifact storage via
+`--serve-artifacts`. Do not re-add `tracking_uri: "sqlite:///..."` or
+`artifact_location: "file:..."` to configs; doing so re-introduces the
+devcontainer-vs-host path-pollution bug that motivated the migration in
+the first place.
+
+A correctly-logged run has `artifact_uri` of the form
+`mlflow-artifacts:/<exp_id>/<run_id>/artifacts` — **never** a filesystem
+path. Artifacts physically live inside the Docker named volume
+`mlflow-infra_mlflow-artifacts`, reachable only via the server API or
+`docker exec mlflow-server`. The project-local `./mlruns/` directory
+should not exist; if you see it reappear, a client is falling back to
+the local file store and the config is wrong.
+
+### Downloading artifacts
+
+Artifacts (checkpoints, configs, etc.) live inside the Docker named volume
+and are **not** directly accessible on the host filesystem. Use the MLflow
+CLI to download them:
+```bash
+# Download a specific artifact (e.g., a checkpoint)
+mlflow artifacts download \
+  -r <run_id> \
+  -a checkpoints/<checkpoint>.ckpt \
+  -d ./checkpoints
+
+# Download all artifacts for a run
+mlflow artifacts download -r <run_id> -d ./artifacts
+
+# Path mapping: mlflow-artifacts:/<exp_id>/<run_id>/artifacts/...
+# maps to /mlflow/mlartifacts/<exp_id>/<run_id>/artifacts/... inside the container
+```
+
+### Pre-server archive
+
+The pre-migration SQLite store + one high-value run's artifacts are
+archived at `~/mlflow-archive/2026-04-11-pre-server/`. The preserved run
+`c0b2e0ebd99243cc80e2d44c83a8c602` is the **ResNet18 mixed-dataset base
+checkpoint for SWA continuation** — its five top-K checkpoints and two
+configs are the only artifacts still on disk. See the archive's own
+`README.md` for the full inventory and how to open the archive in a
+throwaway MLflow UI. The canonical SWA base checkpoint path (referenced
+by the header of `train_with_mlflow_swa.yaml`) is:
+```
+~/mlflow-archive/2026-04-11-pre-server/mlruns/9/c0b2e0ebd99243cc80e2d44c83a8c602/artifacts/checkpoints/epoch=18-step=15998.ckpt
+```
+
+### Devcontainer wiring
+
+`.devcontainer/devcontainer.json` attaches the devcontainer to `mlflow-net`
+via `runArgs` and sets `MLFLOW_TRACKING_URI=http://mlflow-server:5000`
+via `containerEnv`, so training from inside the devcontainer reaches the
+server the same way host-side training does. The `mlflow-net` Docker
+network must already exist before the devcontainer starts (it's created
+once by `~/projects/mlflow-infra` via `docker network create mlflow-net`).
+Inside the container, `localhost` is the container itself — the
+service-name form is mandatory.
 
 ## Image-Based Pipeline
 
@@ -251,6 +370,7 @@ Configs use YAML with [jsonargparse](https://jsonargparse.readthedocs.io/) via L
 
 - `configs/fingerspelling5_singlehands/train_with_mlflow_mixed.yaml` — **current primary** (35 epochs, multi-source dataset, cosine warmup LR, `MLFlowSystemMetricsLogger`, 5 validation sources, top-30 checkpoints)
 - `configs/fingerspelling5_singlehands/train_with_mlflow.yaml` — single-source variant (80 epochs, 4 validation sources, per-source normalization stats, `FXAALite`+`ImageSharpening` in CPU transforms)
+- `configs/fingerspelling5_singlehands/train_with_mlflow_swa.yaml` — SWA continuation (15 epochs, `WeightAveraging` + `SWALR`, fresh AdamW, sweep `swa_lr`; used with `train_mlflow_swa.py` and `--model_init_ckpt`)
 - `configs/sphere/training.yaml` — sphere experiment training
 
 ## Docker & DevContainer
