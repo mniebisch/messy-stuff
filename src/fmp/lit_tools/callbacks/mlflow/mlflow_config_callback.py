@@ -31,6 +31,7 @@ import hashlib
 import json
 import logging
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -204,10 +205,6 @@ class MLFlowConfigCallback(SaveConfigCallback):
                 overwrite=self.overwrite,
                 multifile=self.multifile,
             )
-
-        # Call parent's save_config method
-        if trainer.is_global_zero:
-            self.save_config(trainer, pl_module, stage)
             self.already_saved = True
 
         # Broadcast state
@@ -241,9 +238,30 @@ class MLFlowConfigCallback(SaveConfigCallback):
             )
             self._log_resolved_config_as_artifact(mlflow_logger, resolved_filename)
 
+        # Log launch command
+        self._log_launch_command(mlflow_logger)
+
         # Log summary tags
         if self.log_summary_tags:
             self._log_summary_tags(mlflow_logger)
+
+    def _log_launch_command(self, mlflow_logger: MLFlowLogger) -> None:
+        """Log the CLI command that launched this run as an MLflow tag.
+
+        Args:
+            mlflow_logger: The MLFlow logger instance.
+        """
+        run_id = mlflow_logger.run_id
+        if run_id is None:
+            return
+
+        command = " ".join(sys.argv)
+        try:
+            mlflow_logger.experiment.set_tag(
+                run_id, "launch_command", command
+            )
+        except Exception as e:
+            logger.warning(f"Failed to log launch command: {e}")
 
     def _get_mlflow_logger(self, trainer: L.Trainer) -> MLFlowLogger | None:
         """Extract MLFlow logger from trainer.
